@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>West Coast Studio - Declan Gainey</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Fixed header -->
+    <header class="site-header">
+      <a href="index.html" class="site-wordmark">
+        <span class="wordmark-first">WEST COAST</span>
+        <span class="wordmark-last">STUDIO</span>
+      </a>
+      <button class="menu-toggle" aria-label="Open navigation">
+        <span></span>
+        <span></span>
+      </button>
+    </header>
+
+    <main>
+      <!-- HERO (home) -->
+      <section id="hero" class="panel hero hero--home">
+        <div class="hero-inner">
+          <div class="hero-text">
+            <h1 class="hero-line hero-line-top">nothing ordinary</h1>
+            <h1 class="hero-line hero-line-bottom">
+              is worth <span class="accent">remembering</span>
+            </h1>
+          </div>
+
+          <div class="hero-portfolio">
+            <p class="hero-portfolio-name">
+              <span class="hero-name-first">declan</span>
+              <span class="hero-name-last accent">gainey</span>
+            </p>
+            <p class="hero-portfolio-sub">
+              specializing in ai powered websites, tools, and brand visuals
+              across ux, ui, motion, 3d, and illustration.
+            </p>
+          </div>
+
+          <div class="hero-scroll-indicator">scroll to enter</div>
+        </div>
+      </section>
+
+      <!-- STACKED AREA: ABOUT + SKILLS + SERVICES -->
+      <section class="panel-stack">
+        <!-- ABOUT -->
+        <section id="about" class="panel agency-intro">
+          <!-- EPIC ANIMATED VISUAL BACKGROUND -->
+          <div class="visual-background">
+            <div class="mesh-gradient">
+              <div class="gradient-blob gradient-blob-1"></div>
+              <div class="gradient-blob gradient-blob-2"></div>
+              <div class="gradient-blob gradient-blob-3"></div>
+              <div class="gradient-blob gradient-blob-4"></div>
+              <div class="gradient-blob gradient-blob-5"></div>
+            </div>
+            <div class="geometric-shapes">
+              <div class="shape shape-1"></div>
+              <div class="shape shape-2"></div>
+              <div class="shape shape-3"></div>
+              <div class="shape shape-4"></div>
+            </div>
+            <div class="grid-overlay"></div>
+            <div class="particles">
+              <div class="particle"></div>
+              <div class="particle"></div>
+              <div class="particle"></div>
+              <div class="particle"></div>
+              <div class="particle"></div>
+              <div class="particle"></div>
+              <div class="particle"></div>
+              <div class="particle"></div>
+            </div>
+            <div class="light-rays"></div>
+          </div>
+
+          <div class="agency-intro-inner">
+            <h2 class="agency-headline">
+              <span class="agency-line">
+                i create illustration, storyboards,
+              </span>
+              <span class="agency-line">
+                and <span class="no-break">motion-led</span> visuals obsessed
+                with
+              </span>
+              <span class="agency-line agency-line-rotating">
+                <span class="rotating-word-container">
+                  <span class="rotating-word" id="rotatingWord">emotion</span>
+                </span>
+              </span>
+              <span class="agency-line">
+                so your passion feels alive online.
+              </span>
+            </h2>
+          </div>
+        </section>
+
+        <!-- SKILLS SECTION -->
+        <section id="skills" class="panel skills-showcase">
+          <div class="skills-showcase-inner">
+            <h2 class="skills-title">skills</h2>
+          </div>
+          <div class="skills-carousel-wrapper">
+            <!-- First carousel - scrolls left to right -->
+            <div class="skills-carousel" data-direction="right">
+              <div class="skills-track">
+                <span class="skill-badge">3d modeling</span>
+                <span class="skill-badge">cinema 4d</span>
+                <span class="skill-badge">blender</span>
+                <span class="skill-badge">motion graphics</span>
+                <span class="skill-badge">after effects</span>
+                <span class="skill-badge">illustration</span>
+                <span class="skill-badge">art direction</span>
+                <span class="skill-badge">brand identity</span>
+                <!-- Duplicate for seamless loop -->
+                <span class="skill-badge">3d modeling</span>
+                <span class="skill-badge">cinema 4d</span>
+                <span class="skill-badge">blender</span>
+                <span class="skill-badge">motion graphics</span>
+                <span class="skill-badge">after effects</span>
+                <span class="skill-badge">illustration</span>
+                <span class="skill-badge">art direction</span>
+                <span class="skill-badge">brand identity</span>
+              </div>
+            </div>
+            <!-- Second carousel - scrolls right to left -->
+            <div class="skills-carousel" data-direction="left">
+              <div class="skills-track">
+                <span class="skill-badge">video editing</span>
+                <span class="skill-badge">premiere pro</span>
+                <span class="skill-badge">photography</span>
+                <span class="skill-badge">graphic design</span>
+                <span class="skill-badge">photoshop</span>
+                <span class="skill-badge">creative direction</span>
+                <span class="skill-badge">social content</span>
+                <span class="skill-badge">web design</span>
+                <!-- Duplicate for seamless loop -->
+                <span class="skill-badge">video editing</span>
+                <span class="skill-badge">premiere pro</span>
+                <span class="skill-badge">photography</span>
+                <span class="skill-badge">graphic design</span>
+                <span class="skill-badge">photoshop</span>
+                <span class="skill-badge">creative direction</span>
+                <span class="skill-badge">social content</span>
+                <span class="skill-badge">web design</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SERVICES / CASE STUDIES -->
+        <section id="services" class="panel services">
+          <div class="services-inner">
+            <h2 class="section-title">work</h2>
+
+            <!-- Task Orbit -->
+            <article class="service-row case-study" data-href="approach.html">
+              <div class="case-bg case-bg--taskorbit"></div>
+              <div class="service-header">
+                <h3 class="service-name">task orbit</h3>
+                <div class="service-details">
+                  <p class="service-desc service-desc--summary">
+                    ai powered task app that turns pasted content into a clean
+                    actionable task list.
+                  </p>
+                </div>
+              </div>
+
+              <div class="service-gallery case-gallery">
+                <!-- Card 1 - the ask -->
+                <div class="case-item">
+                  <div class="thumb thumb-1">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">the ask</span>
+                      <p class="case-card-sub">
+                        create an app that turns scattered tabs, emails, and
+                        notes into one focused system.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="task2.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                <!-- Card 2 - my role -->
+                <div class="case-item">
+                  <div class="thumb thumb-2">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">my role</span>
+                      <p class="case-card-sub">
+                        end to end build. design ux and motion, build the ui,
+                        and wire up task extraction.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="task3.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                <!-- Card 3 - output -->
+                <div class="case-item">
+                  <div class="thumb thumb-3">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">output</span>
+                      <p class="case-card-sub">
+                        a polished console that converts messy inputs into
+                        structured tasks.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="task1.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <!-- BRANDCO  -->
+            <article class="service-row case-study" data-href="approach.html">
+              <div class="case-bg case-bg--design"></div>
+              <div class="service-header">
+                <h3 class="service-name">broken hearts</h3>
+                <div class="service-details">
+                  <p class="service-desc service-desc--summary">
+                    design-led production turning brand assets into product
+                    visuals and social edits at scale.
+                  </p>
+                </div>
+              </div>
+
+              <div class="service-gallery case-gallery">
+                <!-- ask -->
+                <div class="case-item">
+                  <div class="thumb thumb-1">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">the ask</span>
+                      <p class="case-card-sub">
+                        turn brand assets into shippable product imagery and
+                        social content.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="brandco1.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                <!-- my role -->
+                <div class="case-item">
+                  <div class="thumb thumb-2">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">my role</span>
+                      <p class="case-card-sub">
+                        designed layflats, composited apparel graphics, and
+                        generated on-model visuals.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="brandco2.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                <!-- output -->
+                <div class="case-item">
+                  <div class="thumb thumb-3">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">output</span>
+                      <p class="case-card-sub">
+                        dozens of product visuals plus short-form edits for
+                        listings and social.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="brandco3.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <!-- 3D Case Study (placeholder) -->
+            <article class="service-row case-study" data-href="approach.html">
+              <div class="case-bg case-bg--threed"></div>
+              <div class="service-header">
+                <h3 class="service-name">amerikid</h3>
+                <div class="service-details">
+                  <p class="service-desc service-desc--summary">
+                    designed and shipped the brand’s online experience across
+                    web, socials, and motion
+                  </p>
+                </div>
+              </div>
+
+              <div class="service-gallery case-gallery">
+                <!-- ask -->
+                <div class="case-item">
+                  <div class="thumb thumb-1">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">the ask</span>
+                      <p class="case-card-sub">
+                        make the brand feel real online and drive product and
+                        community engagement.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="akid2.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                <!-- my role -->
+                <div class="case-item">
+                  <div class="thumb thumb-2">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">my role</span>
+                      <p class="case-card-sub">
+                        visual system, ui, shopify build, and social edits from
+                        concept to launch.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="akid4.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                <!-- output -->
+                <div class="case-item">
+                  <div class="thumb thumb-3">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">output</span>
+                      <p class="case-card-sub">
+                        live shopify site plus drop-ready social edits and
+                        motion assets used across launches.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="akid3.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <!-- Lab Case Study (placeholder) -->
+            <article class="service-row case-study" data-href="approach.html">
+              <div class="case-bg case-bg--lab"></div>
+              <div class="service-header">
+                <h3 class="service-name">nile secure</h3>
+                <div class="service-details">
+                  <p class="service-desc service-desc--summary">
+                    internal comms comics for nile secure that turned security
+                    topics into fast, on-brand stories.
+                  </p>
+                </div>
+              </div>
+
+              <div class="service-gallery case-gallery">
+                <!-- ask -->
+                <div class="case-item">
+                  <div class="thumb thumb-1">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">the ask</span>
+                      <p class="case-card-sub">
+                        make security guidance feel readable and human for
+                        employees.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="nile1.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                <!-- my role -->
+                <div class="case-item">
+                  <div class="thumb thumb-2">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">my role</span>
+                      <p class="case-card-sub">
+                        wrote the beats, illustrated the panels, and matched
+                        brand tone for newsletter delivery.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="nile2.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+
+                <!-- output -->
+                <div class="case-item">
+                  <div class="thumb thumb-3">
+                    <a href="approach.html" class="thumb-link case-card">
+                      <span class="case-card-label">output</span>
+                      <p class="case-card-sub">
+                        two finished comic strips packaged for internal email
+                        and pdf layouts.
+                      </p>
+
+                      <div class="case-card-media">
+                        <video
+                          class="service-video"
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="none"
+                          data-autoplay="true"
+                        >
+                          <source data-src="nile3.mp4" type="video/mp4" />
+                          your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <footer class="site-footer">
+        <p>© <span id="year"></span> declan gainey. all rights reserved.</p>
+      </footer>
+    </main>
+
+    <!-- overlay menu -->
+    <div id="menuOverlay" class="menu-overlay">
+      <button class="menu-close" aria-label="close navigation">×</button>
+      <nav class="overlay-nav">
+        <a href="index.html#services">work</a>
+        <a href="approach.html">approach</a>
+        <a href="contact.html">contact</a>
+      </nav>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

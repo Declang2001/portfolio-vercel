@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact – West Coast Studio</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="site-wordmark">
+      <span class="wordmark-first">WEST COAST</span>
+      <span class="wordmark-last">STUDIO</span>
+    </a>
+
+    <button class="menu-toggle" aria-label="Open navigation">
+      <span></span>
+      <span></span>
+    </button>
+  </header>
+
+  <main>
+    <section class="panel contact-page">
+      <div class="contact-inner">
+        <h1 class="contact-title">Contact</h1>
+        <p class="contact-intro">
+          For freelance projects, collaborations, or studio support,
+          use the form below or email
+          <a href="mailto:declangainey@gmail.com">declangainey@gmail.com</a>.
+        </p>
+
+        <form class="contact-form" id="contactForm">
+          <input type="hidden" name="access_key" value="742a3b0c-0c8a-4af7-a9e0-052523566cfd" />
+          <input type="hidden" name="subject" value="New Contact from West Coast Studio" />
+          <input type="hidden" name="from_name" value="West Coast Studio Website" />
+          <input type="checkbox" name="botcheck" style="display: none;" />
+
+          <div class="form-row">
+            <label for="name">Name</label>
+            <input id="name" name="name" type="text" required />
+          </div>
+
+          <div class="form-row">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required />
+          </div>
+
+          <div class="form-row">
+            <label for="project">Project Type</label>
+            <input id="project" name="project" type="text" placeholder="Brand, video, 3D, social, etc." />
+          </div>
+
+          <div class="form-row">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" rows="5" required></textarea>
+          </div>
+
+          <button type="submit" class="contact-submit">
+            Send Message
+          </button>
+
+          <div id="formResult" class="form-result"></div>
+        </form>
+
+        <script>
+          const form = document.getElementById('contactForm');
+          const result = document.getElementById('formResult');
+
+          form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const object = Object.fromEntries(formData);
+            const json = JSON.stringify(object);
+
+            result.innerHTML = "Sending...";
+            result.className = "form-result sending";
+
+            fetch('https://api.web3forms.com/submit', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: json
+            })
+            .then(async (response) => {
+              let data = await response.json();
+              if (response.status === 200) {
+                result.innerHTML = "Message sent successfully!";
+                result.className = "form-result success";
+                form.reset();
+              } else {
+                result.innerHTML = data.message || "Something went wrong.";
+                result.className = "form-result error";
+              }
+            })
+            .catch(error => {
+              result.innerHTML = "Failed to send. Please try again.";
+              result.className = "form-result error";
+            });
+          });
+        </script>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <p>© <span id="year"></span> Declan Gainey. All rights reserved.</p>
+    </footer>
+  </main>
+
+  <div id="menuOverlay" class="menu-overlay">
+    <button class="menu-close" aria-label="Close navigation">×</button>
+    <nav class="overlay-nav">
+      <a href="index.html#services">Work</a>
+      <a href="approach.html">Approach</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
