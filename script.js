@@ -602,12 +602,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Tile id -> list of files to cycle through in order
   const rotationMap = {
-    'tile-3d': ['lab7.mp4'],
-    'tile-final': ['s3.mp4'],
-    'tile-edit': ['vid2.mp4'],
-    'tile-brand': ['vid3.mp4', 'vid2.mp4'],
-    'tile-sound': ['vid1.mp4', 'vid5.mp4'],
-    'tile-type': ['vid4.mp4'],
+    'tile-3d': ['https://res.cloudinary.com/ddpcw88mj/video/upload/lab7.mp4'],
+    'tile-final': ['https://res.cloudinary.com/ddpcw88mj/video/upload/s3.mp4'],
+    'tile-edit': ['https://res.cloudinary.com/ddpcw88mj/video/upload/vid2.mp4'],
+    'tile-brand': ['https://res.cloudinary.com/ddpcw88mj/video/upload/vid3.mp4', 'https://res.cloudinary.com/ddpcw88mj/video/upload/vid2.mp4'],
+    'tile-sound': ['https://res.cloudinary.com/ddpcw88mj/video/upload/vid1.mp4', 'https://res.cloudinary.com/ddpcw88mj/video/upload/vid5.mp4'],
+    'tile-type': ['https://res.cloudinary.com/ddpcw88mj/video/upload/vid4.mp4'],
     'tile-delivery': ['https://res.cloudinary.com/ddpcw88mj/video/upload/d3.mp4']
   };
 
