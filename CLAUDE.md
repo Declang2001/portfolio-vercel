@@ -42,8 +42,11 @@ vercel --prod                  # production deploy
 
 # Sanity checks before commit
 git diff --stat                # review what changed
-grep -rn "\.mp4\|\.jpg" *.html *.js | grep -v cloudinary  # ensure no local media refs
+# Required check before any commit — no local media refs allowed
+grep -R -n -E '\b(\./)?(videos/|images/)?[A-Za-z0-9_-]+\.(mp4|mov|webm|jpg|jpeg|png|gif|webp)\b' . | grep -v 'res\.cloudinary\.com' | grep -v '\.git' | grep -v 'MEDIA_MAP\.md'
 ```
+
+- **Never commit or push changes unless Declan explicitly approves after reviewing `git diff` output.**
 
 ## File Structure
 
