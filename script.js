@@ -608,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'tile-brand': ['vid3.mp4', 'vid2.mp4'],
     'tile-sound': ['vid1.mp4', 'vid5.mp4'],
     'tile-type': ['vid4.mp4'],
-    'tile-delivery': ['d3.mp4']
+    'tile-delivery': ['https://res.cloudinary.com/ddpcw88mj/video/upload/d3.mp4']
   };
 
   // Fetch all first videos early for fast startup
