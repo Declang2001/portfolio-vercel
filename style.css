@@ -1860,7 +1860,7 @@ body.services-active .services::before {
   aspect-ratio: 16 / 9;
   border-radius: 18px;
   overflow: hidden;
-  background: #000;
+  background: #050505;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85);
 }
@@ -1869,6 +1869,8 @@ body.services-active .services::before {
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
+  z-index: 0;
   background: radial-gradient(
     circle at 20% 0%,
     rgba(168, 85, 247, 0.25),
@@ -1878,7 +1880,7 @@ body.services-active .services::before {
   pointer-events: none;
 }
 
-/* Video / image fills frame */
+/* Video / image fills frame — always above pseudo overlays */
 .approach-tile-video video,
 .approach-tile-video img {
   position: absolute;
@@ -1888,6 +1890,8 @@ body.services-active .services::before {
   object-fit: cover;
   background: #000;
   display: block;
+  position: relative;
+  z-index: 1;
 }
 
 /* Fade for collage videos that swap sources */
@@ -2004,25 +2008,47 @@ body.services-active .services::before {
     margin-bottom: 3rem;
   }
 
-  .collage-stack {
-    padding-top: 4vh;
-    padding-bottom: 10vh;
+  /* --- Pinned scroll-driven horizontal rail --- */
+  .approach-page .collage-scroll-section {
     position: relative;
-    isolation: isolate;
+    /* height set by JS: pinH + scrollDistance */
+  }
+
+  .approach-page .collage-scroll-pin {
+    position: sticky;
+    top: calc(var(--header-height) + 24px);
+    height: calc(100vh - var(--header-height) - 40px);
+    display: flex;
+    align-items: center;
+    overflow: visible;
+  }
+
+  .collage-stack {
+    display: flex;
+    gap: clamp(1.5rem, 2.5vw, 3rem);
+    padding-inline: calc(clamp(1.5rem, 4vw, 4rem) + var(--railPadExtra, 0px));
+    overflow-x: hidden;
+    overflow-y: visible;
+    scroll-snap-type: none;
+    scrollbar-width: none;
+    perspective: 1100px;
+  }
+
+  .collage-stack::-webkit-scrollbar {
+    display: none;
   }
 
   .collage-stack::after {
-    content: "";
-    display: block;
-    height: 220vh;
+    content: none;
   }
 
   .collage-panel {
-    position: sticky;
-    top: calc(var(--wcs-header-height) + 24px);
-    min-height: calc(100vh - var(--wcs-header-height) - 40px);
-    margin: 0 auto 95vh;
-    max-width: min(1140px, 94vw);
+    position: relative;
+    top: auto;
+    flex: 0 0 min(1140px, 85vw);
+    min-height: auto;
+    margin: 0;
+    max-width: none;
     padding: 1.5rem 2rem 2rem;
     background: #050505;
     border-radius: 24px;
@@ -2030,6 +2056,9 @@ body.services-active .services::before {
     display: flex;
     flex-direction: column;
     overflow: visible;
+    scroll-snap-align: none;
+    transform-style: preserve-3d;
+    will-change: transform, opacity;
   }
 
   .collage-panel:last-of-type {
@@ -2048,12 +2077,6 @@ body.services-active .services::before {
   }
 
   .collage-stack > .collage-panel { z-index: 1; }
-  .collage-stack > .collage-panel:nth-child(1) { z-index: 10; }
-  .collage-stack > .collage-panel:nth-child(2) { z-index: 20; }
-  .collage-stack > .collage-panel:nth-child(3) { z-index: 30; }
-  .collage-stack > .collage-panel:nth-child(4) { z-index: 40; }
-  .collage-stack > .collage-panel:nth-child(5) { z-index: 50; }
-  .collage-stack > .collage-panel:nth-child(6) { z-index: 60; }
 
   .approach-grid {
     grid-template-columns: 2fr 1.1fr 1.1fr;
@@ -2080,6 +2103,12 @@ body.services-active .services::before {
   .approach-tile--tall-right .approach-tile-video {
     height: 210px;
     max-height: 210px;
+  }
+
+  /* On approach page, let aspect-ratio control size instead of fixed heights */
+  .approach-page .approach-tile-video {
+    height: auto;
+    max-height: none;
   }
 
   .approach-caption {
@@ -2312,9 +2341,10 @@ body.services-active .services::before {
    - keep sticky stacking safe (no caption clipping)
    ========================================================= */
 
-/* 1) remove the shadow on every collage tile frame */
+/* 1) Single shadow system: panel has shadow, tiles do not */
 .approach-page .approach-tile-video {
   box-shadow: none !important;
+  border: none !important;
 }
 
 /* 2) desktop ratios (non-sticky and sticky) */
@@ -2331,44 +2361,159 @@ body.services-active .services::before {
   .approach-page .approach-tile--tall-right .approach-tile-video { aspect-ratio: 9 / 16; }
 }
 
-/* 3) sticky desktop (1200+) needs controlled heights so captions never get cut off */
+/* 3) Desktop 1200+: Sliver rail for ALL collage panels */
 @media (min-width: 1200px) {
-  /* center tiles so the “fixed ratio” frames look intentional inside the grid cells */
-  .approach-page .collage-panel .approach-tile {
-    align-items: center;
+  /* Panels need overflow visible so slivers can lift without clipping */
+  .approach-page .collage-panel {
+    overflow: visible;
   }
 
-  .approach-page .collage-panel .approach-caption {
-    text-align: center;
-    margin-top: 0.25rem;
-    font-size: 0.85rem;
-    line-height: 1.25;
+  /* --- Sliver rail wrappers (shared) --- */
+  .approach-page .collage-panel .sliverRailWrap {
+    display: flex;
+    justify-content: center;
+    width: 100%;
   }
 
-  /* let the frame shrink to its ratio instead of forcing full-width */
-  .approach-page .collage-panel .approach-tile-video {
-    display: inline-block;
+  .approach-page .collage-panel .sliverRail {
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding: 22px 0 26px;
+    position: relative;
+  }
+
+  /* --- The sliver track (converts grid to flex for all panels) --- */
+  .approach-page .approach-grid.sliverTrack {
+    --sliverW: clamp(120px, 9vw, 150px);
+    --expandedW: clamp(420px, 48vw, 560px);
+    display: flex;
+    gap: clamp(16px, 1.8vw, 26px);
+    width: 100%;
+    justify-content: center;
+    align-items: stretch;
+    height: clamp(420px, 58vh, 620px);
+    perspective: 900px;
+    position: relative;
+    z-index: 1;
+    /* neutralize grid templates */
+    grid-template-columns: none;
+    grid-template-rows: none;
+    grid-template-areas: none;
+  }
+
+  .approach-page .approach-grid.sliverTrack .approach-tile {
+    grid-area: unset;
+  }
+
+  /* Each sliver tile */
+  .approach-page .approach-grid.sliverTrack .approach-tile {
+    flex: 0 0 var(--sliverW);
+    height: 100%;
+    min-width: 0;
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #050505;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    z-index: 1;
+    transition: flex-basis 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+                transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+                filter 0.35s ease,
+                box-shadow 0.35s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Tile frames fill entire sliver */
+  .approach-page .approach-grid.sliverTrack .approach-tile-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: unset;
+    border-radius: inherit;
+    display: block;
     max-height: none !important;
-    height: auto;
+    background: #050505;
   }
 
-  /* top two 16:9 */
-  .approach-page .collage-panel .approach-tile--primary .approach-tile-video,
-  .approach-page .collage-panel .approach-tile--top .approach-tile-video {
-    height: clamp(170px, 22vh, 240px);
-    aspect-ratio: 16 / 9;
+  .approach-page .approach-grid.sliverTrack .approach-tile-video video,
+  .approach-page .approach-grid.sliverTrack .approach-tile-video img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    z-index: 1;
   }
 
-  .approach-page .collage-panel .approach-tile--bottom .approach-tile-video {
-    height: clamp(200px, 26vh, 280px); /* match tall tiles */
-    aspect-ratio: 3 / 4;
+  /* Dim non-hovered slivers */
+  .approach-page .approach-grid.sliverTrack:hover .approach-tile {
+    filter: saturate(0.85) brightness(0.9);
   }
 
-  /* bottom right two 9:16 */
-  .approach-page .collage-panel .approach-tile--tall-left .approach-tile-video,
-  .approach-page .collage-panel .approach-tile--tall-right .approach-tile-video {
-    height: clamp(200px, 26vh, 280px);
-    aspect-ratio: 9 / 16;
+  /* Expanded sliver on hover/focus */
+  .approach-page .approach-grid.sliverTrack .approach-tile:hover,
+  .approach-page .approach-grid.sliverTrack .approach-tile:focus-within {
+    flex-basis: var(--expandedW);
+    transform: translateY(-12px) rotateY(-4deg);
+    filter: none;
+    z-index: 5;
+    box-shadow: 0 16px 60px rgba(168, 85, 247, 0.25),
+                0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Caption: hidden by default, revealed on hover */
+  .approach-page .approach-grid.sliverTrack .approach-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    margin: 0;
+    padding: 2.25rem 1rem 1rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.82), transparent);
+    border-radius: 0 0 18px 18px;
+    font-size: clamp(0.9rem, 1.05vw, 1.1rem);
+    line-height: 1.35;
+    text-align: center;
+    color: #fff;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.25s ease, max-height 0.3s ease;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .approach-page .approach-grid.sliverTrack .approach-tile:hover .approach-caption,
+  .approach-page .approach-grid.sliverTrack .approach-tile:focus-within .approach-caption {
+    opacity: 1;
+    max-height: 90px;
+  }
+}
+
+/* Reduced motion: all sliver panels + card 3D */
+@media (min-width: 1200px) and (prefers-reduced-motion: reduce) {
+  .approach-page .approach-grid.sliverTrack .approach-tile {
+    transition: flex-basis 0.15s ease;
+    transform: none !important;
+  }
+  .approach-page .approach-grid.sliverTrack .approach-tile:hover,
+  .approach-page .approach-grid.sliverTrack .approach-tile:focus-within {
+    transform: none !important;
+  }
+  .approach-page .approach-grid.sliverTrack .approach-caption {
+    transition: opacity 0.1s ease;
+  }
+  .approach-page .collage-panel {
+    transform: none !important;
+    opacity: 1 !important;
   }
 }
 /* =========================================================
@@ -2382,7 +2527,7 @@ body.services-active .services::before {
   isolation: isolate;
   border: 1px solid rgba(255, 255, 255, 0.06);
 
-  /* stronger “work card” style backdrop */
+  /* stronger "work card" style backdrop */
   background:
     radial-gradient(circle at 18% 0%,
       var(--panel-glow-a, rgba(168, 85, 247, 0.16)),
@@ -2395,11 +2540,14 @@ body.services-active .services::before {
       transparent 55%),
     #050505;
 
+  /* Single shadow system — panel only, no tile shadows */
   box-shadow: 0 26px 80px rgba(0, 0, 0, 0.7);
 }
 
-/* make the glow read inside the tiles too (this is why you couldn’t “see it”) */
+
+/* make the glow read inside the tiles too (this is why you couldn't "see it") */
 .approach-page .approach-tile-video::after {
+  border-radius: inherit;
   background:
     radial-gradient(circle at 20% 0%,
       var(--panel-glow-a, rgba(168, 85, 247, 0.22)),
@@ -2441,6 +2589,82 @@ body.services-active .services::before {
   --panel-glow-a: rgba(168, 85, 247, 0.20);
   --panel-glow-b: rgba(255, 140, 90, 0.12);
 }
+
+/* Clickable video tiles */
+.approach-page .approach-tile-video {
+  cursor: pointer;
+}
+
+/* =========================================================
+   VIDEO PREVIEW MODAL
+   ========================================================= */
+.video-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.88);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.video-modal-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.video-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 85vh;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.9);
+}
+
+.video-modal-content video,
+.video-modal-content img {
+  display: block;
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+}
+
+.video-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s ease;
+}
+
+.video-modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-modal-overlay {
+    transition: none;
+  }
+}
+
 /* =========================================================
    OVERLAY MENU: match site typography (same feel as hero)
    ========================================================= */

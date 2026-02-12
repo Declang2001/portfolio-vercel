@@ -1,5 +1,54 @@
 # Media Asset Map
 
+## Approach Page — Per-Card Breakdown
+
+All slivers play muted in cards. Modal may unmute on click (browser permitting).
+
+| Card | Panel ID | Asset | Cloudinary URL |
+|------|----------|-------|----------------|
+| UX/UI | collage-01 | intro2.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/intro2.mp4 |
+| UX/UI | collage-01 | lab1.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/lab1.mp4 |
+| UX/UI | collage-01 | lab2.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/lab2.mp4 |
+| UX/UI | collage-01 | intro3.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/intro3.mp4 |
+| UX/UI | collage-01 | lab6.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/lab6.mp4 |
+| Storytelling | collage-storytelling | story4.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/story4.mp4 |
+| Storytelling | collage-storytelling | story1.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/story1.mp4 |
+| Storytelling | collage-storytelling | story2.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/story2.mp4 |
+| Storytelling | collage-storytelling | story3.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/story3.mp4 |
+| Storytelling | collage-storytelling | story6.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/story6.mp4 |
+| AmeriKid | collage-02 | s2.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/s2.mp4 |
+| AmeriKid | collage-02 | lab7.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/lab7.mp4 |
+| AmeriKid | collage-02 | s1.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/s1.mp4 |
+| AmeriKid | collage-02 | s3.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/s3.mp4 |
+| Branding | collage-03 | vid2.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/vid2.mp4 |
+| Branding | collage-03 | vid4.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/vid4.mp4 |
+| Branding | collage-03 | vid3.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/vid3.mp4 |
+| Branding | collage-03 | vid1.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/vid1.mp4 |
+| Branding | collage-03 | d3.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/d3.mp4 |
+| Design | collage-04 | logo1.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/logo1.mp4 |
+| Design | collage-04 | lab3.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/lab3.mp4 |
+| Design | collage-04 | s5.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/s5.mp4 |
+| Design | collage-04 | d9.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/d9.mp4 |
+| Design | collage-04 | d4.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/d4.mp4 |
+| Illustration | collage-05 | i5.jpg | https://res.cloudinary.com/ddpcw88mj/image/upload/i5.jpg |
+| Illustration | collage-05 | i1.jpg | https://res.cloudinary.com/ddpcw88mj/image/upload/i1.jpg |
+| Illustration | collage-05 | i2.jpg | https://res.cloudinary.com/ddpcw88mj/image/upload/i2.jpg |
+| Illustration | collage-05 | i3.jpg | https://res.cloudinary.com/ddpcw88mj/image/upload/i3.jpg |
+| Illustration | collage-05 | i4.jpg | https://res.cloudinary.com/ddpcw88mj/image/upload/i4.jpg |
+
+**Hero video:** `intro.mp4` — https://res.cloudinary.com/ddpcw88mj/video/upload/intro.mp4
+**Footer playlist:** `lab8.mp4` — https://res.cloudinary.com/ddpcw88mj/video/upload/lab8.mp4
+
+### Swapping or adding a video
+1. Upload to Cloudinary under `ddpcw88mj`
+2. Update the `src` attribute in `approach.html`
+3. Update this table
+4. Run the local-media grep from `CLAUDE.md` to verify no local refs
+
+---
+
+## Full Asset Inventory
+
 | local_path | type | used_in | cloudinary_public_id | cloudinary_url | notes |
 |------------|------|---------|----------------------|----------------|-------|
 | akid2.mp4 | video | index.html | akid2.mp4 | https://res.cloudinary.com/ddpcw88mj/video/upload/akid2.mp4 | |

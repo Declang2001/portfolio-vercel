@@ -422,42 +422,201 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
-  // 11. Approach collage panels: click anywhere in a collage panel -> contact.html
+  // 11. Approach collage: video/image preview modal (replaces old click-to-contact)
   if (document.body.classList.contains('approach-page')) {
-    const collageStack = document.querySelector('.collage-stack');
-
-    if (collageStack) {
-      collageStack.addEventListener(
-        'click',
-        (e) => {
-          // only handle clicks that originated inside a collage panel
-          const panel = e.target.closest('.collage-panel');
-          if (!panel) return;
-
-          // do not hijack header/menu interactions
-          if (
-            e.target.closest('.site-header') ||
-            e.target.closest('.menu-overlay') ||
-            e.target.closest('.menu-toggle') ||
-            e.target.closest('.menu-close') ||
-            e.target.closest('a')
-          ) {
-            return;
-          }
-
-          // allow modified clicks (new tab, etc.) to behave normally
-          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-
-          e.preventDefault();
-          e.stopPropagation();
-          window.location.href = 'contact.html';
-        },
-        true // capture so this wins over any tile click handlers
-      );
-    }
+    initApproachVideoModal();
   }
 
 });
+
+
+// Video preview modal for approach page tiles
+function initApproachVideoModal() {
+  // Build modal DOM
+  const overlay = document.createElement('div');
+  overlay.className = 'video-modal-overlay';
+  overlay.innerHTML = '<div class="video-modal-content"><button class="video-modal-close" aria-label="Close">&times;</button></div>';
+  document.body.appendChild(overlay);
+
+  const content = overlay.querySelector('.video-modal-content');
+  const closeBtn = overlay.querySelector('.video-modal-close');
+  let activeMedia = null;
+
+  function openModal(tile) {
+    const video = tile.querySelector('video');
+    const img = tile.querySelector('img');
+
+    // Remove any previous media in modal
+    const prev = content.querySelector('video, img');
+    if (prev) prev.remove();
+
+    if (video) {
+      const clone = document.createElement('video');
+      const source = video.querySelector('source');
+      clone.src = (source && source.src) || video.currentSrc || video.src;
+      clone.autoplay = true;
+      clone.loop = true;
+      clone.muted = false;
+      clone.volume = 1;
+      clone.controls = true;
+      clone.playsInline = true;
+      content.appendChild(clone);
+      // Try unmuted first (user gesture context); fallback to muted
+      clone.play().catch(() => {
+        clone.muted = true;
+        clone.play().catch(() => {});
+      });
+      activeMedia = clone;
+    } else if (img) {
+      const clone = document.createElement('img');
+      clone.src = img.src;
+      clone.alt = img.alt || '';
+      content.appendChild(clone);
+      activeMedia = clone;
+    } else {
+      return;
+    }
+
+    overlay.classList.add('is-open');
+  }
+
+  function closeModal() {
+    overlay.classList.remove('is-open');
+    if (activeMedia && activeMedia.tagName === 'VIDEO') {
+      activeMedia.pause();
+      activeMedia.removeAttribute('src');
+      activeMedia.load();
+    }
+    const media = content.querySelector('video, img');
+    if (media) media.remove();
+    activeMedia = null;
+  }
+
+  // Click on a tile video frame opens modal
+  document.querySelector('.collage-stack').addEventListener('click', (e) => {
+    const tileVideo = e.target.closest('.approach-tile-video');
+    if (!tileVideo) return;
+
+    // Don't interfere with header/menu clicks
+    if (e.target.closest('.site-header') || e.target.closest('a')) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    openModal(tileVideo);
+  });
+
+  // Close handlers
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeModal();
+  });
+}
+
+
+// Pinned collage rail: vertical page scroll drives horizontal card advance (desktop only)
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.body.classList.contains('approach-page')) return;
+  initPinnedCollageScroll();
+});
+
+function initPinnedCollageScroll() {
+  const isDesktop = () => window.matchMedia('(min-width: 1200px)').matches;
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  const section = document.getElementById('collageScrollSection');
+  const pin     = document.getElementById('collageScrollPin');
+  const stack   = document.getElementById('collageStack');
+  if (!section || !pin || !stack) return;
+
+  const panels = stack.querySelectorAll('.collage-panel');
+  const endBufferPx = 260;
+
+  let scrollDistance = 0;
+  let startY = 0;
+  let topOffset = 0;
+
+  function recalc() {
+    if (!isDesktop()) {
+      section.style.height = '';
+      stack.scrollLeft = 0;
+      stack.style.setProperty('--railPadExtra', '0px');
+      panels.forEach(p => { p.style.transform = ''; p.style.opacity = ''; });
+      return;
+    }
+
+    // --- Start centering: compute extra left padding so first card is centered ---
+    stack.style.setProperty('--railPadExtra', '0px');
+    const basePadLeft = parseFloat(getComputedStyle(stack).paddingLeft) || 0;
+    const firstPanel = panels[0];
+    if (firstPanel) {
+      const firstW = firstPanel.getBoundingClientRect().width;
+      const desiredPad = Math.max(0, (stack.clientWidth - firstW) / 2);
+      const extra = Math.max(0, desiredPad - basePadLeft);
+      stack.style.setProperty('--railPadExtra', extra + 'px');
+    }
+
+    // Recompute after padding change
+    scrollDistance = Math.max(0, stack.scrollWidth - stack.clientWidth);
+
+    const topStr = getComputedStyle(pin).top || '0px';
+    topOffset = parseFloat(topStr) || 0;
+
+    const pinH = pin.getBoundingClientRect().height || 0;
+
+    // Extra vertical runway = scrollDistance + end buffer
+    section.style.height = (pinH + scrollDistance + endBufferPx) + 'px';
+
+    const sectionTop = section.getBoundingClientRect().top + window.scrollY;
+    startY = sectionTop - topOffset;
+
+    sync();
+  }
+
+  let ticking = false;
+  function sync() {
+    if (!isDesktop() || scrollDistance <= 0) return;
+
+    // Map vertical scroll to horizontal — clamp t to [0,1] using only scrollDistance
+    const raw = (window.scrollY - startY) / scrollDistance;
+    const t = Math.max(0, Math.min(1, raw));
+    stack.scrollLeft = t * scrollDistance;
+
+    // Subtle 3D card transforms (skip if reduced motion)
+    if (!prefersReduced.matches) {
+      const cx = stack.clientWidth / 2;
+      const range = stack.clientWidth * 0.6;
+      panels.forEach(p => {
+        const pcx = (p.offsetLeft - stack.scrollLeft) + (p.offsetWidth / 2);
+        const n = Math.max(-1, Math.min(1, (pcx - cx) / range));
+        const absN = Math.abs(n);
+        const ry = (-n * 10).toFixed(2);
+        const tz = (-absN * 90).toFixed(1);
+        const sc = (1 - absN * 0.05).toFixed(3);
+        const op = (1 - absN * 0.25).toFixed(3);
+        p.style.transform = `rotateY(${ry}deg) translateZ(${tz}px) scale(${sc})`;
+        p.style.opacity = op;
+      });
+    }
+  }
+
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { ticking = false; sync(); });
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', recalc);
+  // ResizeObserver catches content-driven size changes (images/videos loading)
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(recalc).observe(stack);
+  }
+  window.addEventListener('load', recalc);
+  recalc();
+}
 
 
 // Approach page hero: match home hero text drift + mid-screen fade, while video eases in
@@ -688,3 +847,5 @@ document.addEventListener('DOMContentLoaded', () => {
     tile.addEventListener('click', fadeToNext);
   });
 });
+
+
