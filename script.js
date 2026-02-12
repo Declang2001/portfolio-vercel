@@ -555,7 +555,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const e = easeOutCubic(t);
 
     const minScale = 0.62;
-    const maxScale = 1.07;
+    const baseW = videoWrapper.offsetWidth;
+    const baseH = videoWrapper.offsetHeight;
+    const coverScale = Math.max(window.innerWidth / baseW, window.innerHeight / baseH) + 0.01;
+    const maxScale = Math.max(1.07, coverScale);
     const scale = minScale + e * (maxScale - minScale);
 
     videoWrapper.style.transform = `translate3d(-50%, -50%, 0) scale3d(${scale}, ${scale}, 1)`;
