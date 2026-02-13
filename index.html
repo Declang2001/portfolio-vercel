@@ -5,6 +5,162 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>West Coast Studio - Declan Gainey</title>
     <link rel="stylesheet" href="style.css" />
+    <style>
+      @media (min-width: 768px) {
+        #workCollage { max-width: min(980px, 92vw); margin-left: auto; margin-right: auto; }
+        #workCollage .comic-panel--top,
+        #workCollage .comic-panel--sq { aspect-ratio: 4 / 3; }
+      }
+
+      #skills {
+        --console-border: rgba(255, 255, 255, 0.12);
+        --console-glow: rgba(111, 222, 255, 0.25);
+        --console-ink: rgba(255, 255, 255, 0.86);
+        --console-muted: rgba(255, 255, 255, 0.55);
+        --console-accent: rgba(89, 220, 255, 0.9);
+        --console-bg: rgba(10, 16, 26, 0.5);
+      }
+
+      #skills .skills-console {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 clamp(1.5rem, 7vw, 7rem);
+        display: grid;
+        gap: clamp(1.5rem, 4vw, 3rem);
+        grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+        align-items: start;
+        position: relative;
+      }
+
+      #skills .skills-console::before {
+        content: "";
+        position: absolute;
+        inset: -10% -5% -15%;
+        background:
+          radial-gradient(circle at 10% 15%, rgba(83, 198, 255, 0.18), transparent 55%),
+          radial-gradient(circle at 85% 20%, rgba(255, 165, 104, 0.14), transparent 50%),
+          radial-gradient(circle at 40% 80%, rgba(120, 105, 255, 0.12), transparent 55%);
+        pointer-events: none;
+        filter: blur(6px);
+        z-index: 0;
+      }
+
+      #skills .skills-console > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      #skills .skills-console-nav {
+        display: grid;
+        gap: 0.75rem;
+        padding: 1rem;
+        border: 1px solid var(--console-border);
+        border-radius: 20px;
+        background: linear-gradient(150deg, rgba(20, 28, 44, 0.9), rgba(12, 18, 30, 0.6));
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(10px);
+      }
+
+      #skills .skills-console-nav button {
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--console-muted);
+        font-size: 0.95rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        padding: 0.85rem 1rem;
+        border-radius: 12px;
+        text-align: left;
+        cursor: pointer;
+        transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+      }
+
+      #skills .skills-console-nav button[aria-selected="true"] {
+        color: var(--console-ink);
+        border-color: var(--console-accent);
+        background: linear-gradient(130deg, rgba(89, 220, 255, 0.18), rgba(89, 220, 255, 0.05));
+        box-shadow: 0 0 20px rgba(89, 220, 255, 0.18);
+      }
+
+      #skills .skills-console-panels {
+        min-height: 320px;
+      }
+
+      #skills .skills-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+      }
+
+      #skills .skills-card {
+        --mx: 50%;
+        --my: 50%;
+        --rx: 0deg;
+        --ry: 0deg;
+        border: 1px solid var(--console-border);
+        border-radius: 18px;
+        padding: 1.15rem 1.1rem;
+        color: var(--console-ink);
+        background:
+          radial-gradient(circle at var(--mx) var(--my), rgba(111, 222, 255, 0.25), transparent 55%),
+          linear-gradient(140deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+          0 12px 28px rgba(5, 12, 22, 0.45);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+        transform-style: preserve-3d;
+        transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry)) translateZ(0);
+        transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      #skills .skills-card:focus-visible {
+        outline: 2px solid var(--console-accent);
+        outline-offset: 3px;
+      }
+
+      #skills .skills-card[data-tilt-active="true"] {
+        border-color: rgba(111, 222, 255, 0.5);
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+          0 14px 28px rgba(5, 12, 22, 0.55),
+          0 0 24px rgba(89, 220, 255, 0.18);
+      }
+
+      #skills .skills-card span {
+        display: block;
+        transform: translateZ(18px);
+      }
+
+      #skills .skills-console-panels [hidden] {
+        display: none;
+      }
+
+      @media (max-width: 900px) {
+        #skills .skills-console {
+          grid-template-columns: 1fr;
+        }
+
+        #skills .skills-console-nav {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        #skills .skills-console-nav button {
+          text-align: center;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #skills .skills-card {
+          transition: none;
+          transform: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <!-- Fixed header -->
@@ -104,49 +260,49 @@
           <div class="skills-showcase-inner">
             <h2 class="skills-title">skills</h2>
           </div>
-          <div class="skills-carousel-wrapper">
-            <!-- First carousel - scrolls left to right -->
-            <div class="skills-carousel" data-direction="right">
-              <div class="skills-track">
-                <span class="skill-badge">3d modeling</span>
-                <span class="skill-badge">cinema 4d</span>
-                <span class="skill-badge">blender</span>
-                <span class="skill-badge">motion graphics</span>
-                <span class="skill-badge">after effects</span>
-                <span class="skill-badge">illustration</span>
-                <span class="skill-badge">art direction</span>
-                <span class="skill-badge">brand identity</span>
-                <!-- Duplicate for seamless loop -->
-                <span class="skill-badge">3d modeling</span>
-                <span class="skill-badge">cinema 4d</span>
-                <span class="skill-badge">blender</span>
-                <span class="skill-badge">motion graphics</span>
-                <span class="skill-badge">after effects</span>
-                <span class="skill-badge">illustration</span>
-                <span class="skill-badge">art direction</span>
-                <span class="skill-badge">brand identity</span>
-              </div>
+          <div class="skills-console" data-skills-console>
+            <div class="skills-console-nav" role="tablist" aria-label="skill categories">
+              <button id="skills-tab-design" role="tab" aria-controls="skills-panel-design" aria-selected="true" tabindex="0">design</button>
+              <button id="skills-tab-motion" role="tab" aria-controls="skills-panel-motion" aria-selected="false" tabindex="-1">motion</button>
+              <button id="skills-tab-creative" role="tab" aria-controls="skills-panel-creative" aria-selected="false" tabindex="-1">creative dev</button>
+              <button id="skills-tab-tools" role="tab" aria-controls="skills-panel-tools" aria-selected="false" tabindex="-1">tools</button>
             </div>
-            <!-- Second carousel - scrolls right to left -->
-            <div class="skills-carousel" data-direction="left">
-              <div class="skills-track">
-                <span class="skill-badge">video editing</span>
-                <span class="skill-badge">premiere pro</span>
-                <span class="skill-badge">photography</span>
-                <span class="skill-badge">graphic design</span>
-                <span class="skill-badge">photoshop</span>
-                <span class="skill-badge">creative direction</span>
-                <span class="skill-badge">social content</span>
-                <span class="skill-badge">web design</span>
-                <!-- Duplicate for seamless loop -->
-                <span class="skill-badge">video editing</span>
-                <span class="skill-badge">premiere pro</span>
-                <span class="skill-badge">photography</span>
-                <span class="skill-badge">graphic design</span>
-                <span class="skill-badge">photoshop</span>
-                <span class="skill-badge">creative direction</span>
-                <span class="skill-badge">social content</span>
-                <span class="skill-badge">web design</span>
+            <div class="skills-console-panels">
+              <div id="skills-panel-design" role="tabpanel" aria-labelledby="skills-tab-design">
+                <div class="skills-card-grid">
+                  <button class="skills-card" type="button"><span>ui design</span></button>
+                  <button class="skills-card" type="button"><span>ux prototyping</span></button>
+                  <button class="skills-card" type="button"><span>interaction design</span></button>
+                  <button class="skills-card" type="button"><span>design systems</span></button>
+                  <button class="skills-card" type="button"><span>typography + layout</span></button>
+                </div>
+              </div>
+              <div id="skills-panel-motion" role="tabpanel" aria-labelledby="skills-tab-motion" hidden>
+                <div class="skills-card-grid">
+                  <button class="skills-card" type="button"><span>motion design</span></button>
+                  <button class="skills-card" type="button"><span>after effects</span></button>
+                  <button class="skills-card" type="button"><span>video editing</span></button>
+                  <button class="skills-card" type="button"><span>animation + timing</span></button>
+                  <button class="skills-card" type="button"><span>motion design</span></button>
+                </div>
+              </div>
+              <div id="skills-panel-creative" role="tabpanel" aria-labelledby="skills-tab-creative" hidden>
+                <div class="skills-card-grid">
+                  <button class="skills-card" type="button"><span>html + css</span></button>
+                  <button class="skills-card" type="button"><span>javascript</span></button>
+                  <button class="skills-card" type="button"><span>three.js</span></button>
+                  <button class="skills-card" type="button"><span>shopify liquid</span></button>
+                  <button class="skills-card" type="button"><span>git</span></button>
+                </div>
+              </div>
+              <div id="skills-panel-tools" role="tabpanel" aria-labelledby="skills-tab-tools" hidden>
+                <div class="skills-card-grid">
+                  <button class="skills-card" type="button"><span>figma</span></button>
+                  <button class="skills-card" type="button"><span>illustrator</span></button>
+                  <button class="skills-card" type="button"><span>photoshop</span></button>
+                  <button class="skills-card" type="button"><span>premiere pro</span></button>
+                  <button class="skills-card" type="button"><span>blender</span></button>
+                </div>
               </div>
             </div>
           </div>
@@ -193,7 +349,7 @@
               <a href="work-02-task-orbit.html" class="comic-panel comic-panel--sq">
                 <div class="comic-panel-video">
                   <video muted loop playsinline preload="none">
-                    <source data-src="https://res.cloudinary.com/ddpcw88mj/video/upload/task1.mp4" type="video/mp4" />
+                    <source data-src="https://res.cloudinary.com/ddpcw88mj/video/upload/intro2.mp4" type="video/mp4" />
                   </video>
                 </div>
                 <div class="comic-panel-overlay">
@@ -206,7 +362,7 @@
               <a href="work-03-broken-hearts.html" class="comic-panel comic-panel--sq">
                 <div class="comic-panel-video">
                   <video muted loop playsinline preload="none">
-                    <source data-src="https://res.cloudinary.com/ddpcw88mj/video/upload/brandco1.mp4" type="video/mp4" />
+                    <source data-src="https://res.cloudinary.com/ddpcw88mj/video/upload/d3.mp4" type="video/mp4" />
                   </video>
                 </div>
                 <div class="comic-panel-overlay">
@@ -219,7 +375,7 @@
               <a href="work-04-amerikid.html" class="comic-panel comic-panel--sq">
                 <div class="comic-panel-video">
                   <video muted loop playsinline preload="none">
-                    <source data-src="https://res.cloudinary.com/ddpcw88mj/video/upload/akid2.mp4" type="video/mp4" />
+                    <source data-src="https://res.cloudinary.com/ddpcw88mj/video/upload/lab8.mp4" type="video/mp4" />
                   </video>
                 </div>
                 <div class="comic-panel-overlay">
@@ -232,7 +388,7 @@
               <a href="work-05-nile-secure.html" class="comic-panel comic-panel--sq">
                 <div class="comic-panel-video">
                   <video muted loop playsinline preload="none">
-                    <source data-src="https://res.cloudinary.com/ddpcw88mj/video/upload/nile1.mp4" type="video/mp4" />
+                    <source data-src="https://res.cloudinary.com/ddpcw88mj/video/upload/nile3.mp4" type="video/mp4" />
                   </video>
                 </div>
                 <div class="comic-panel-overlay">
@@ -261,6 +417,77 @@
       </nav>
     </div>
 
+    <script>
+      (() => {
+        const consoleEl = document.querySelector('[data-skills-console]');
+        if (!consoleEl) return;
+
+        const tabs = Array.from(consoleEl.querySelectorAll('[role="tab"]'));
+        const panels = Array.from(consoleEl.querySelectorAll('[role="tabpanel"]'));
+
+        const activateTab = (tab) => {
+          tabs.forEach((button) => {
+            const isActive = button === tab;
+            button.setAttribute('aria-selected', String(isActive));
+            button.tabIndex = isActive ? 0 : -1;
+          });
+
+          panels.forEach((panel) => {
+            const isActive = panel.id === tab.getAttribute('aria-controls');
+            panel.hidden = !isActive;
+          });
+        };
+
+        tabs.forEach((tab, index) => {
+          tab.addEventListener('click', () => activateTab(tab));
+          tab.addEventListener('keydown', (event) => {
+            const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+            if (!keys.includes(event.key)) return;
+            event.preventDefault();
+            let nextIndex = index;
+            if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+            if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+            if (event.key === 'Home') nextIndex = 0;
+            if (event.key === 'End') nextIndex = tabs.length - 1;
+            tabs[nextIndex].focus();
+            activateTab(tabs[nextIndex]);
+          });
+        });
+
+        const canHover = window.matchMedia('(hover: hover)').matches;
+        const finePointer = window.matchMedia('(pointer: fine)').matches;
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!canHover || !finePointer || reduceMotion) return;
+
+        const cards = consoleEl.querySelectorAll('.skills-card');
+        cards.forEach((card) => {
+          card.addEventListener('pointermove', (event) => {
+            const rect = card.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const mx = (x / rect.width) * 100;
+            const my = (y / rect.height) * 100;
+            const dx = x - rect.width / 2;
+            const dy = y - rect.height / 2;
+            const rx = (-dy / rect.height) * 10;
+            const ry = (dx / rect.width) * 10;
+            card.style.setProperty('--mx', `${mx}%`);
+            card.style.setProperty('--my', `${my}%`);
+            card.style.setProperty('--rx', `${rx.toFixed(2)}deg`);
+            card.style.setProperty('--ry', `${ry.toFixed(2)}deg`);
+            card.dataset.tiltActive = 'true';
+          });
+
+          card.addEventListener('pointerleave', () => {
+            card.style.setProperty('--mx', '50%');
+            card.style.setProperty('--my', '50%');
+            card.style.setProperty('--rx', '0deg');
+            card.style.setProperty('--ry', '0deg');
+            card.dataset.tiltActive = 'false';
+          });
+        });
+      })();
+    </script>
     <script src="script.js"></script>
   </body>
 </html>
