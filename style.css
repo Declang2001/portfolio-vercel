@@ -2770,3 +2770,360 @@ body.services-active .services::before {
     transform: none;
   }
 }
+
+/* =========================================================
+   WORK 5-PANEL COLLAGE (index.html)
+   ========================================================= */
+
+/* Collage wrapper — centered under "work" heading */
+.work-collage {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 3vw, 2rem);
+}
+
+/* Grid — mobile-first single column */
+.work-collage-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+/* Individual panel */
+.comic-panel {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: #050505;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transform: translate3d(var(--hx, 0px), var(--hy, 0px), 0) scale(var(--hs, 1));
+  transition: filter 0.35s ease,
+              border-color 0.35s ease,
+              box-shadow 0.35s ease,
+              transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Mobile: all panels 16:9 */
+.comic-panel { aspect-ratio: 16 / 9; }
+
+/* --- Tablet + Desktop (≥768px): 12-col grid, 2 top wides + 2×2 squares --- */
+@media (min-width: 768px) {
+  .work-collage-grid {
+    grid-template-columns: repeat(12, 1fr);
+    gap: 8px;
+  }
+
+  .comic-panel--top {
+    grid-column: span 6;
+    aspect-ratio: 1 / 1;
+  }
+
+  .comic-panel--sq {
+    grid-column: span 6;
+    aspect-ratio: 1 / 1;
+  }
+}
+
+/* Video fills panel (gradient bg for empty panels) */
+.comic-panel-video {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #0a0a0a 0%, #111 60%, #0d0816 100%);
+}
+
+.comic-panel-video video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Subtle purple tint */
+.comic-panel-video::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: radial-gradient(circle at 20% 0%, rgba(168, 85, 247, 0.2), transparent 60%);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+/* Caption overlay — always visible, above splice */
+.comic-panel-overlay {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 10;
+  padding: 2.5rem 1.25rem 1.25rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), transparent);
+  border-radius: 0 0 14px 14px;
+}
+
+.comic-panel-name {
+  margin: 0;
+  font-size: clamp(1.1rem, 1.8vw, 1.5rem);
+  font-weight: 700;
+  text-transform: lowercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+}
+
+.comic-panel-desc {
+  margin: 0.35rem 0 0;
+  font-size: clamp(0.78rem, 0.9vw, 0.92rem);
+  color: var(--muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Full-page dim backdrop when a panel is focused --- */
+body.work-panel-active::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+/* --- Dim + focus (hover-capable fine pointer only) --- */
+@media (hover: hover) and (pointer: fine) {
+  .work-collage-grid:hover .comic-panel {
+    filter: saturate(0.8) brightness(0.7);
+  }
+
+  .comic-panel.is-focus {
+    filter: none !important;
+    border-color: rgba(168, 85, 247, 0.45);
+    box-shadow: 0 20px 60px rgba(168, 85, 247, 0.25), 0 10px 24px rgba(0, 0, 0, 0.5);
+    z-index: 20;
+  }
+}
+
+/* --- Touch: no dim --- */
+@media (hover: none) and (pointer: coarse) {
+  .work-collage-grid:hover .comic-panel { filter: none; }
+}
+
+/* =====  REAL SPLICE EFFECT (built by JS)  ===== */
+
+.splice-wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.splice-slice {
+  position: absolute;
+  top: 0; bottom: 0;
+  overflow: hidden;
+  transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transform: translate3d(0, 0, 0);
+  pointer-events: none;
+}
+
+.splice-slice video {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Left slice: first third */
+.splice-slice--left  { left: 0; width: 33.34%; }
+.splice-slice--left video { width: 300%; left: 0; }
+
+/* Mid slice: middle third */
+.splice-slice--mid   { left: 33.34%; width: 33.33%; }
+.splice-slice--mid video  { width: 300%; left: -100%; }
+
+/* Right slice: last third */
+.splice-slice--right { left: 66.67%; width: 33.33%; }
+.splice-slice--right video { width: 300%; left: -200%; }
+
+/* Split shadow edges between slices */
+.splice-slice--left  { box-shadow: inset -2px 0 6px rgba(0,0,0,0.6); }
+.splice-slice--right { box-shadow: inset  2px 0 6px rgba(0,0,0,0.6); }
+
+/* Hover separates slices (desktop pointer only) */
+@media (hover: hover) and (pointer: fine) {
+  .comic-panel.is-focus .splice-slice--left {
+    transform: translate3d(-14px, 0, 0) rotate(-0.4deg);
+  }
+  .comic-panel.is-focus .splice-slice--mid {
+    transform: translate3d(0, -4px, 0);
+  }
+  .comic-panel.is-focus .splice-slice--right {
+    transform: translate3d(14px, 0, 0) rotate(0.4deg);
+  }
+}
+
+/* Hide splice wrap by default, show only when built */
+.splice-wrap { display: none; }
+.comic-panel.has-splice .splice-wrap { display: block; }
+.comic-panel.has-splice .comic-panel-video > video { visibility: hidden; }
+
+/* --- Reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .comic-panel {
+    transition: filter 0.15s ease, border-color 0.15s ease;
+    transform: none !important;
+  }
+  .splice-slice {
+    transition: none;
+    transform: none !important;
+  }
+}
+
+/* CURSOR FX — disabled */
+
+/* =========================================================
+   CASE STUDY PAGES (static)
+   ========================================================= */
+
+.case-study-page {
+  min-height: 100vh;
+  padding-top: calc(var(--header-height) + 3rem);
+  padding-bottom: 4rem;
+}
+
+.case-study-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 clamp(1.25rem, 5vw, 3rem);
+}
+
+/* Hero */
+.case-study-hero {
+  margin-bottom: 3rem;
+}
+
+.case-study-title {
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  font-weight: 700;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+  color: #fff;
+}
+
+.case-study-subtitle {
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  color: var(--muted);
+  margin: 0.75rem 0 0;
+  line-height: 1.5;
+  max-width: 640px;
+}
+
+/* 3-column layout */
+.case-study-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+@media (min-width: 768px) {
+  .case-study-columns {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2.5rem;
+  }
+}
+
+.case-study-col p {
+  font-size: 0.95rem;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0.5rem 0 0;
+}
+
+.case-study-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.12em;
+  color: rgba(168, 85, 247, 0.85);
+  margin: 0;
+}
+
+/* Media grid */
+.case-study-media {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+@media (min-width: 768px) {
+  .case-study-media {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2rem;
+  }
+}
+
+.case-study-media-item {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #050505;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.case-study-media-item video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.case-study-media-label {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  margin: 0;
+  z-index: 2;
+}
+
+/* Back link */
+.case-study-back {
+  display: inline-block;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  transition: color 0.2s ease;
+}
+
+.case-study-back:hover {
+  color: #fff;
+}
+
+/* Placeholder box for media items without video */
+.case-study-media-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #0a0a0a 0%, #111 60%, #0d0816 100%);
+  border-radius: inherit;
+}

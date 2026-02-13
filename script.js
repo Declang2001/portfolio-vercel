@@ -619,6 +619,162 @@ function initPinnedCollageScroll() {
 }
 
 
+// WORK COLLAGE — lazy-load, hover-to-play, splice builder, hover-centering (index page)
+document.addEventListener('DOMContentLoaded', () => {
+  const panels = document.querySelectorAll('.comic-panel');
+  if (!panels.length) return;
+
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  // --- Lazy-load video sources via IntersectionObserver ---
+  const loadVideo = (video) => {
+    const sources = video.querySelectorAll('source[data-src]');
+    let swapped = false;
+    sources.forEach((s) => {
+      if (!s.src && s.dataset.src) { s.src = s.dataset.src; swapped = true; }
+    });
+    if (swapped) { video.preload = 'metadata'; video.load(); }
+  };
+
+  // Load a clone's sources from the master video's resolved src
+  const loadClone = (clone, master) => {
+    const masterSrc = master.querySelector('source');
+    if (!masterSrc || !masterSrc.src) return;
+    const cloneSrc = clone.querySelector('source');
+    if (cloneSrc && !cloneSrc.src) {
+      cloneSrc.src = masterSrc.src;
+      clone.preload = 'metadata';
+      clone.load();
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    const obs = new IntersectionObserver((entries, o) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        const v = e.target.querySelector('.comic-panel-video > video');
+        if (v) {
+          loadVideo(v);
+          // When master loads, propagate src to clones
+          v.addEventListener('loadedmetadata', () => {
+            const clones = e.target.querySelectorAll('.splice-slice video');
+            clones.forEach((c) => loadClone(c, v));
+          }, { once: true });
+        }
+        o.unobserve(e.target);
+      });
+    }, { rootMargin: '400px 0px', threshold: 0.01 });
+    panels.forEach((p) => obs.observe(p));
+  } else {
+    panels.forEach((p) => {
+      const v = p.querySelector('.comic-panel-video > video');
+      if (v) loadVideo(v);
+    });
+  }
+
+  // --- Build real splice structure for panels with video (desktop only) ---
+  if (canHover && !prefersReduced) {
+    panels.forEach((panel) => {
+      const mediaBox = panel.querySelector('.comic-panel-video');
+      const master = mediaBox ? mediaBox.querySelector('video') : null;
+      if (!master) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'splice-wrap';
+
+      ['left', 'mid', 'right'].forEach((pos) => {
+        const slice = document.createElement('div');
+        slice.className = 'splice-slice splice-slice--' + pos;
+        const clone = master.cloneNode(true);
+        // Clear src on clones — they get it when master loads
+        clone.querySelectorAll('source').forEach((s) => {
+          if (s.dataset.src) { s.removeAttribute('src'); }
+        });
+        clone.removeAttribute('preload');
+        slice.appendChild(clone);
+        wrap.appendChild(slice);
+      });
+
+      mediaBox.appendChild(wrap);
+      panel.classList.add('has-splice');
+
+      // If master already has src loaded, propagate to clones now
+      const masterSrc = master.querySelector('source');
+      if (masterSrc && masterSrc.src) {
+        wrap.querySelectorAll('.splice-slice video').forEach((c) => loadClone(c, master));
+      }
+    });
+  }
+
+  // --- Desktop: play on hover with splice sync ---
+  if (canHover) {
+    panels.forEach((panel) => {
+      const master = panel.querySelector('.comic-panel-video > video');
+      if (!master) return;
+
+      const clones = Array.from(panel.querySelectorAll('.splice-slice video'));
+      let syncRaf = 0;
+
+      // RAF loop: keep clones synced to master
+      const syncLoop = () => {
+        const t = master.currentTime;
+        clones.forEach((c) => {
+          if (Math.abs(c.currentTime - t) > 0.03) c.currentTime = t;
+        });
+        syncRaf = requestAnimationFrame(syncLoop);
+      };
+
+      panel.addEventListener('mouseenter', () => {
+        master.muted = true;
+        master.play().catch(() => {});
+        // Play + sync clones
+        clones.forEach((c) => {
+          c.muted = true;
+          c.currentTime = master.currentTime;
+          c.play().catch(() => {});
+        });
+        if (clones.length) syncRaf = requestAnimationFrame(syncLoop);
+      });
+
+      panel.addEventListener('mouseleave', () => {
+        master.pause();
+        clones.forEach((c) => c.pause());
+        if (syncRaf) { cancelAnimationFrame(syncRaf); syncRaf = 0; }
+      });
+    });
+  }
+
+  // --- Hover-centering: move focused panel toward viewport center ---
+  if (canHover) {
+    panels.forEach((panel) => {
+      panel.addEventListener('mouseenter', () => {
+        const rect = panel.getBoundingClientRect();
+        const panelCx = rect.left + rect.width / 2;
+        const panelCy = rect.top + rect.height / 2;
+        const vpCx = window.innerWidth / 2;
+        const vpCy = window.innerHeight / 2;
+        const dx = (vpCx - panelCx) * 0.35;
+        const dy = (vpCy - panelCy) * 0.25;
+        panel.style.setProperty('--hx', dx.toFixed(1) + 'px');
+        panel.style.setProperty('--hy', dy.toFixed(1) + 'px');
+        panel.style.setProperty('--hs', '1.14');
+        panel.classList.add('is-focus');
+        document.body.classList.add('work-panel-active');
+      });
+
+      panel.addEventListener('mouseleave', () => {
+        panel.style.setProperty('--hx', '0px');
+        panel.style.setProperty('--hy', '0px');
+        panel.style.setProperty('--hs', '1');
+        panel.classList.remove('is-focus');
+        document.body.classList.remove('work-panel-active');
+      });
+    });
+  }
+});
+
+
 // Approach page hero: match home hero text drift + mid-screen fade, while video eases in
 document.addEventListener('DOMContentLoaded', () => {
   const approachHero = document.querySelector('.hero.hero--approach');
@@ -849,3 +1005,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// CURSOR FX — disabled
