@@ -949,6 +949,44 @@ body.services-active .services::before {
   -webkit-backdrop-filter: none;
 }
 
+/* Work / Approach toggle heading */
+.services .section-title.section-title--work {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: clamp(2.4rem, 5.5vw, 4.6rem);
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+}
+
+.services .section-title--work .work-switch {
+  font: inherit;
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+
+.services .section-title--work .work-switch.is-active,
+.services .section-title--work .work-switch[aria-current="page"] {
+  color: var(--accent);
+  text-shadow:
+    0 0 6px rgba(168, 85, 247, 0.6),
+    0 0 14px rgba(168, 85, 247, 0.4);
+}
+
+.services .section-title--work .work-switch:hover {
+  color: var(--accent);
+  text-shadow:
+    0 0 6px rgba(168, 85, 247, 0.6),
+    0 0 14px rgba(168, 85, 247, 0.4);
+}
+
+.services .section-title--work .work-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+  border-radius: 8px;
+}
+
 /* Base card styling */
 .service-row {
   max-width: 1200px;
@@ -2777,7 +2815,7 @@ body.services-active .services::before {
 
 /* Collage wrapper — centered under "work" heading */
 .work-collage {
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   padding: 0 clamp(1rem, 3vw, 2rem);
 }
