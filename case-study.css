@@ -15,7 +15,7 @@
   --cs-motif-opacity: 0.045;
   --cs-max: 1200px;
   --cs-pad: clamp(1.5rem, 5vw, 4rem);
-  --cs-block-gap: clamp(1.25rem, 3vh, 2.25rem);
+  --cs-block-gap: clamp(1rem, 2.5vh, 1.8rem);
 }
 
 /* ── Root wrapper ── */
@@ -51,7 +51,7 @@
    ============================================================ */
 .cs-hero {
   padding-top: clamp(10rem, 22vh, 16rem);
-  padding-bottom: var(--cs-block-gap);
+  padding-bottom: 0;
   text-align: center;
 }
 
@@ -85,7 +85,7 @@
 }
 
 .cs-title {
-  font-size: clamp(2.8rem, 7vw, 5.5rem);
+  font-size: clamp(2.4rem, 6vw, 4.8rem);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -236,7 +236,7 @@
 }
 
 /* ============================================================
-   TRIAD (goal / contribution / result)
+   TRIAD (brief / build / result)
    ============================================================ */
 .cs-triad {
   display: grid;
