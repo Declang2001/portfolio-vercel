@@ -2876,7 +2876,8 @@ body.services-active .services::before {
   background: linear-gradient(135deg, #0a0a0a 0%, #111 60%, #0d0816 100%);
 }
 
-.comic-panel-video video {
+.comic-panel-video video,
+.comic-panel-video img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2970,10 +2971,12 @@ body.work-panel-active::before {
   overflow: hidden;
   transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);
   transform: translate3d(0, 0, 0);
+  background-position: 0 0;
   pointer-events: none;
 }
 
-.splice-slice video {
+.splice-slice video,
+.splice-slice img {
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
@@ -2983,15 +2986,15 @@ body.work-panel-active::before {
 
 /* Left slice: first third */
 .splice-slice--left  { left: 0; width: 33.34%; }
-.splice-slice--left video { width: 300%; left: 0; }
+.splice-slice--left video, .splice-slice--left img { width: 300%; left: 0; }
 
 /* Mid slice: middle third */
 .splice-slice--mid   { left: 33.34%; width: 33.33%; }
-.splice-slice--mid video  { width: 300%; left: -100%; }
+.splice-slice--mid video, .splice-slice--mid img  { width: 300%; left: -100%; }
 
 /* Right slice: last third */
 .splice-slice--right { left: 66.67%; width: 33.33%; }
-.splice-slice--right video { width: 300%; left: -200%; }
+.splice-slice--right video, .splice-slice--right img { width: 300%; left: -200%; }
 
 /* Split shadow edges between slices */
 .splice-slice--left  { box-shadow: inset -2px 0 6px rgba(0,0,0,0.6); }
@@ -3013,7 +3016,15 @@ body.work-panel-active::before {
 /* Hide splice wrap by default, show only when built */
 .splice-wrap { display: none; }
 .comic-panel.has-splice .splice-wrap { display: block; }
-.comic-panel.has-splice .comic-panel-video > video { visibility: hidden; }
+.comic-panel.has-splice .comic-panel-video > video,
+.comic-panel.has-splice .comic-panel-video > img { visibility: hidden; }
+
+/* Task Orbit: slight overscan to eliminate white slivers */
+.comic-panel[href="work-02-task-orbit.html"] .comic-panel-video video,
+.comic-panel[href="work-02-task-orbit.html"] .splice-slice video {
+  transform: scale(1.02);
+  transform-origin: center;
+}
 
 /* --- Reduced motion --- */
 @media (prefers-reduced-motion: reduce) {

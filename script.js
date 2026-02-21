@@ -673,36 +673,51 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- Build real splice structure for panels with video (desktop only) ---
+  // --- Build real splice structure for panels with video or image (desktop only) ---
   if (canHover && !prefersReduced) {
     panels.forEach((panel) => {
       const mediaBox = panel.querySelector('.comic-panel-video');
-      const master = mediaBox ? mediaBox.querySelector('video') : null;
+      const masterVideo = mediaBox ? mediaBox.querySelector('video') : null;
+      const masterImg = mediaBox ? mediaBox.querySelector('img') : null;
+      const master = masterVideo || masterImg;
       if (!master) return;
 
       const wrap = document.createElement('div');
       wrap.className = 'splice-wrap';
 
+      const bgPositions = { left: '0% 0%', mid: '50% 0%', right: '100% 0%' };
+
       ['left', 'mid', 'right'].forEach((pos) => {
         const slice = document.createElement('div');
         slice.className = 'splice-slice splice-slice--' + pos;
-        const clone = master.cloneNode(true);
-        // Clear src on clones — they get it when master loads
-        clone.querySelectorAll('source').forEach((s) => {
-          if (s.dataset.src) { s.removeAttribute('src'); }
-        });
-        clone.removeAttribute('preload');
-        slice.appendChild(clone);
+        if (masterVideo) {
+          const clone = master.cloneNode(true);
+          // Clear src on clones — they get it when master loads
+          clone.querySelectorAll('source').forEach((s) => {
+            if (s.dataset.src) { s.removeAttribute('src'); }
+          });
+          clone.removeAttribute('preload');
+          slice.appendChild(clone);
+        } else {
+          // Image: use background-image so all 3 slices share one seamless image
+          const url = masterImg.currentSrc || masterImg.src;
+          slice.style.backgroundImage = `url("${url}")`;
+          slice.style.backgroundRepeat = 'no-repeat';
+          slice.style.backgroundSize = '300% 100%';
+          slice.style.backgroundPosition = bgPositions[pos];
+        }
         wrap.appendChild(slice);
       });
 
       mediaBox.appendChild(wrap);
       panel.classList.add('has-splice');
 
-      // If master already has src loaded, propagate to clones now
-      const masterSrc = master.querySelector('source');
-      if (masterSrc && masterSrc.src) {
-        wrap.querySelectorAll('.splice-slice video').forEach((c) => loadClone(c, master));
+      // If master is a video with src loaded, propagate to clones now
+      if (masterVideo) {
+        const masterSrc = master.querySelector('source');
+        if (masterSrc && masterSrc.src) {
+          wrap.querySelectorAll('.splice-slice video').forEach((c) => loadClone(c, master));
+        }
       }
     });
   }

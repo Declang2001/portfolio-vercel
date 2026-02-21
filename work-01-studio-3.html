@@ -6,6 +6,7 @@
   <title>Studio 3 Marketing Page | Declan Gainey</title>
   <meta name="description" content="Concept marketing page designed in Figma. A case study by Declan Gainey." />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="case-study.css" />
 </head>
 <body>
   <header class="site-header">
@@ -19,54 +20,90 @@
     </button>
   </header>
 
-  <main>
-    <section class="panel case-study-page">
-      <div class="case-study-inner">
+  <main class="cs" data-project="studio-3">
+    <div class="cs-bg"></div>
+    <div class="cs-inner">
 
-        <div class="case-study-hero">
-          <h1 class="case-study-title">studio 3 marketing page</h1>
-          <p class="case-study-subtitle">concept marketing page designed in figma for a fitness studio brand.</p>
+      <section class="cs-hero">
+        <div class="cs-kickerline">
+          <a href="index.html#services" class="cs-back cs-back--top">&larr; back to work</a>
+          <div class="cs-kicker">case study</div>
+          <div class="cs-kicker-spacer" aria-hidden="true"></div>
         </div>
+        <h1 class="cs-title">studio 3 marketing page</h1>
+        <p class="cs-subtitle">concept marketing page designed in figma for a fitness studio brand.</p>
+        <div class="cs-meta" aria-label="project details">
+          <span class="cs-meta-item"><span class="cs-meta-label">role:</span> visual design + prototyping</span>
+          <span class="cs-meta-item"><span class="cs-meta-label">tools:</span> figma</span>
+          <span class="cs-meta-item"><span class="cs-meta-label">timeline:</span> concept sprint</span>
+          <span class="cs-meta-item"><span class="cs-meta-label">output:</span> responsive landing page design</span>
+        </div>
+      </section>
 
-        <div class="case-study-columns">
-          <div class="case-study-col">
-            <h2 class="case-study-label">the ask</h2>
-            <p>Design a high-converting marketing landing page for a boutique fitness studio launching a new membership tier.</p>
+      <section class="cs-triad" aria-label="case study summary">
+        <div class="cs-triad-col">
+          <h2 class="cs-triad-label">the ask</h2>
+          <p>design a high-converting landing page for a boutique fitness studio's new membership tier.</p>
+        </div>
+        <div class="cs-triad-col">
+          <h2 class="cs-triad-label">my role</h2>
+          <p>visual design, layout system, and interactive figma prototype from brief to dev handoff screens.</p>
+        </div>
+        <div class="cs-triad-col">
+          <h2 class="cs-triad-label">output</h2>
+          <p>desktop + mobile breakpoints with clear hierarchy, pricing flow, and conversion-focused sections.</p>
+        </div>
+      </section>
+
+      <section class="cs-gallery" aria-label="highlights">
+        <div class="cs-gallery-grid">
+          <button class="cs-media" type="button" data-full="https://res.cloudinary.com/ddpcw88mj/video/upload/studio3_2.mp4" data-caption="desktop hero layout">
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="https://res.cloudinary.com/ddpcw88mj/video/upload/studio3_2.mp4" type="video/mp4" />
+            </video>
+            <span class="cs-media-caption">desktop hero layout</span>
+          </button>
+          <button class="cs-media" type="button" data-full="https://res.cloudinary.com/ddpcw88mj/video/upload/studio3_3.mp4" data-caption="membership tier breakdown">
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="https://res.cloudinary.com/ddpcw88mj/video/upload/studio3_3.mp4" type="video/mp4" />
+            </video>
+            <span class="cs-media-caption">membership tier breakdown</span>
+          </button>
+          <button class="cs-media" type="button" data-full="https://res.cloudinary.com/ddpcw88mj/video/upload/studio3_4.mp4" data-caption="mobile responsive view">
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="https://res.cloudinary.com/ddpcw88mj/video/upload/studio3_4.mp4" type="video/mp4" />
+            </video>
+            <span class="cs-media-caption">mobile responsive view</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="cs-deepdive" aria-label="deep dive">
+        <div class="cs-tabs" role="tablist" aria-label="deep dive tabs">
+          <button class="cs-tab is-active" role="tab" aria-selected="true" aria-controls="cs-panel-overview" id="cs-tab-overview" tabindex="0" type="button">overview</button>
+          <button class="cs-tab" role="tab" aria-selected="false" aria-controls="cs-panel-highlights" id="cs-tab-highlights" tabindex="-1" type="button">highlights</button>
+          <button class="cs-tab" role="tab" aria-selected="false" aria-controls="cs-panel-process" id="cs-tab-process" tabindex="-1" type="button">process</button>
+          <div class="cs-tab-indicator" aria-hidden="true"></div>
+        </div>
+        <div class="cs-tabpanels">
+          <div class="cs-panel is-active" role="tabpanel" id="cs-panel-overview" aria-labelledby="cs-tab-overview" tabindex="0">
+            <p class="cs-body">a concept marketing page exploring how a boutique fitness brand could present a premium membership launch. the design focuses on clear hierarchy, bold imagery, and conversion-driven layout patterns across desktop and mobile breakpoints.</p>
           </div>
-          <div class="case-study-col">
-            <h2 class="case-study-label">my role</h2>
-            <p>Visual design, layout, and interactive prototyping in Figma from brief through to final handoff-ready screens.</p>
+          <div class="cs-panel" role="tabpanel" id="cs-panel-highlights" aria-labelledby="cs-tab-highlights" tabindex="0" hidden>
+            <p class="cs-body">strong typographic pairings, a tiered pricing layout that guides the eye, and responsive breakpoints that maintain the premium feel at every screen size. every element was designed to feel intentional and conversion-ready.</p>
           </div>
-          <div class="case-study-col">
-            <h2 class="case-study-label">output</h2>
-            <p>A complete responsive landing page design with desktop and mobile breakpoints, ready for development.</p>
+          <div class="cs-panel" role="tabpanel" id="cs-panel-process" aria-labelledby="cs-tab-process" tabindex="0" hidden>
+            <p class="cs-body">started with competitive analysis and wireframes, moved through multiple visual directions, and refined into a polished figma prototype with interaction annotations for the development handoff.</p>
           </div>
         </div>
+      </section>
 
-        <div class="case-study-media">
-          <div class="case-study-media-item">
-            <h3 class="case-study-media-label">the ask</h3>
-            <div class="case-study-media-placeholder"></div>
-          </div>
-          <div class="case-study-media-item">
-            <h3 class="case-study-media-label">my role</h3>
-            <div class="case-study-media-placeholder"></div>
-          </div>
-          <div class="case-study-media-item">
-            <h3 class="case-study-media-label">output</h3>
-            <div class="case-study-media-placeholder"></div>
-          </div>
-        </div>
-
-        <a href="index.html#services" class="case-study-back">&larr; back to work</a>
-
-      </div>
-    </section>
-
-    <footer class="site-footer">
-      <p>&copy; <span id="year"></span> declan gainey. all rights reserved.</p>
-    </footer>
+    </div>
   </main>
+
+  <footer class="site-footer">
+    <p>&copy; <span id="year"></span> declan gainey. all rights reserved.</p>
+  </footer>
 
   <div id="menuOverlay" class="menu-overlay">
     <button class="menu-close" aria-label="Close navigation">&times;</button>
@@ -78,5 +115,6 @@
   </div>
 
   <script src="script.js"></script>
+  <script src="case-study.js" defer></script>
 </body>
 </html>
