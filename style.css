@@ -166,10 +166,12 @@ a {
 /* Stacking order */
 .panel-stack .agency-intro {
   z-index: 1;
+  margin-bottom: 80vh;
 }
 
 .panel-stack .skills-showcase {
   z-index: 2;
+  margin-bottom: 80vh;
 }
 
 /* Services scroll normally inside the stack */
@@ -183,6 +185,9 @@ a {
 .hero {
   height: 200vh;
   position: relative;
+}
+.hero.hero--home {
+  height: 260vh; /* extra 60vh linger on name + specialization */
 }
 
 .hero-inner {
@@ -228,6 +233,20 @@ a {
   text-shadow:
     0 0 6px rgba(168, 85, 247, 0.6),
     0 0 14px rgba(168, 85, 247, 0.4);
+}
+
+/* Accent drain: color + glow fades as particles leave "remembering" */
+.hero-line-bottom .accent {
+  --rem-drain: 0;
+  color: color-mix(in srgb,
+    var(--accent) calc((1 - var(--rem-drain)) * 100%),
+    #ffffff calc(var(--rem-drain) * 100%));
+  text-shadow:
+    0 0 calc(6px * (1 - var(--rem-drain))) rgba(168, 85, 247, calc(0.6 * (1 - var(--rem-drain)))),
+    0 0 calc(14px * (1 - var(--rem-drain))) rgba(168, 85, 247, calc(0.4 * (1 - var(--rem-drain))));
+}
+@supports not (color: color-mix(in srgb, white 50%, black 50%)) {
+  .hero-line-bottom .accent { color: var(--accent); }
 }
 
 /* Hero accent word */
@@ -283,6 +302,64 @@ a {
 .hero-name-last {
   display: inline-block;
   margin-left: 0.35ch;
+  --gainey-p: 0;
+}
+
+.hero-name-last .hero-name-last-glow {
+  color: color-mix(in srgb, #ffffff calc((1 - var(--gainey-p)) * 100%), var(--accent) calc(var(--gainey-p) * 100%));
+  text-shadow:
+    0 0 calc(6px * var(--gainey-p)) rgba(168, 85, 247, 0.6),
+    0 0 calc(14px * var(--gainey-p)) rgba(168, 85, 247, 0.4);
+}
+
+@supports not (color: color-mix(in srgb, white 50%, black 50%)) {
+  .hero-name-last .hero-name-last-glow { color: #fff; }
+}
+
+/* Accent-transfer particle canvas */
+.hero-accent-particles {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.hero-accent-particles.is-on { opacity: 1; }
+
+/* Accent relay flow stops (home page only) */
+[data-accent-stop] { --flow-p: 0; }
+[data-accent-stop="skills"],
+[data-accent-stop="approach"] {
+  color: color-mix(in srgb,
+    #ffffff calc((1 - var(--flow-p)) * 100%),
+    var(--accent) calc(var(--flow-p) * 100%));
+  text-shadow:
+    0 0 calc(6px * var(--flow-p)) rgba(168,85,247, calc(0.6 * var(--flow-p))),
+    0 0 calc(14px * var(--flow-p)) rgba(168,85,247, calc(0.4 * var(--flow-p)));
+}
+[data-accent-stop="rotating"],
+[data-accent-stop="skills"] { cursor: pointer; }
+[data-accent-stop="skills"]:hover {
+  text-shadow:
+    0 0 8px rgba(168,85,247, 0.5),
+    0 0 20px rgba(168,85,247, 0.3);
+}
+[data-accent-stop="rotating"] {
+  text-shadow:
+    0 0 calc(6px * var(--flow-p)) rgba(168,85,247, calc(0.6 * var(--flow-p))),
+    0 0 calc(14px * var(--flow-p)) rgba(168,85,247, calc(0.4 * var(--flow-p)));
+}
+[data-accent-stop="work"] {
+  text-shadow:
+    0 0 calc(6px + 4px * var(--flow-p)) rgba(168,85,247, calc(0.6 + 0.3 * var(--flow-p))),
+    0 0 calc(14px + 6px * var(--flow-p)) rgba(168,85,247, calc(0.4 + 0.3 * var(--flow-p)));
+}
+@supports not (color: color-mix(in srgb, white 50%, black 50%)) {
+  [data-accent-stop="skills"],
+  [data-accent-stop="approach"] { color: inherit; }
 }
 
 .hero-portfolio-sub {
@@ -785,6 +862,11 @@ a {
 
 /* SKILLS */
 .skills-showcase {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   padding: 16vh 0 18vh;
   background: var(--bg);
   border-top: 1px solid var(--muted-soft);
@@ -796,6 +878,8 @@ a {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 clamp(1.5rem, 7vw, 7rem);
+  position: relative;
+  z-index: 1;
 }
 
 /* Shared heading style for skills + services */

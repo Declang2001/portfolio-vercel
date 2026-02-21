@@ -56,7 +56,7 @@
         border-bottom: 2px solid transparent;
         background: transparent;
         color: var(--console-muted);
-        font-size: clamp(1.15rem, 2vw, 1.35rem);
+        font-size: clamp(1.3rem, 2.2vw, 1.5rem);
         letter-spacing: 0.12em;
         text-transform: none;
         padding: 0.6rem 0;
@@ -103,7 +103,7 @@
         box-shadow: none;
         text-transform: none;
         letter-spacing: 0.08em;
-        font-size: clamp(1.05rem, 1.8vw, 1.2rem);
+        font-size: clamp(1.15rem, 2vw, 1.35rem);
         font-weight: 500;
         text-align: center;
         cursor: pointer;
@@ -187,7 +187,7 @@
           <div class="hero-portfolio">
             <p class="hero-portfolio-name">
               <span class="hero-name-first">declan</span>
-              <span class="hero-name-last accent">gainey</span>
+              <span class="hero-name-last"><span class="hero-name-last-glow">gainey</span></span>
             </p>
             <p class="hero-portfolio-sub">
               specializing in ai powered websites, tools, and brand visuals
@@ -197,6 +197,7 @@
 
           <div class="hero-scroll-indicator">scroll to enter</div>
         </div>
+        <canvas id="heroAccentParticles" class="hero-accent-particles" aria-hidden="true"></canvas>
       </section>
 
       <!-- STACKED AREA: ABOUT + SKILLS + SERVICES -->
@@ -243,7 +244,7 @@
               </span>
               <span class="agency-line agency-line-rotating">
                 <span class="rotating-word-container">
-                  <span class="rotating-word" id="rotatingWord">emotion</span>
+                  <span class="rotating-word" id="rotatingWord" data-accent-stop="rotating">emotion</span>
                 </span>
               </span>
               <span class="agency-line">
@@ -256,7 +257,7 @@
         <!-- SKILLS SECTION -->
         <section id="skills" class="panel skills-showcase">
           <div class="skills-showcase-inner">
-            <h2 class="skills-title">skills</h2>
+            <h2 class="skills-title"><span data-accent-stop="skills">skills</span></h2>
           </div>
           <div class="skills-console" data-skills-console>
             <div class="skills-console-nav" role="tablist" aria-label="skill categories">
@@ -309,8 +310,8 @@
         <section id="services" class="panel services">
           <div class="services-inner">
             <h2 class="section-title section-title--work">
-              <a class="work-switch is-active" href="#services" aria-current="page">work</a>
-              <a class="work-switch" href="approach.html">approach</a>
+              <a class="work-switch is-active" href="#services" aria-current="page"><span data-accent-stop="work">work</span></a>
+              <a class="work-switch" href="approach.html"><span data-accent-stop="approach">approach</span></a>
             </h2>
 
           </div>
