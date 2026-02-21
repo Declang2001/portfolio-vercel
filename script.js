@@ -1,5 +1,32 @@
 // Core interactions for West Coast Studio
 
+// ── Shared viewport helpers (iOS Safari safe) ──
+const _wcsViewport = (() => {
+  const vv = window.visualViewport;
+  const coarsePointer = window.matchMedia('(pointer: coarse)').matches
+    || !window.matchMedia('(hover: hover)').matches;
+
+  function getViewport() {
+    if (vv) return { vw: vv.width, vh: vv.height, ox: vv.offsetLeft, oy: vv.offsetTop };
+    return { vw: window.innerWidth, vh: window.innerHeight, ox: 0, oy: 0 };
+  }
+
+  function getDprCap() {
+    const raw = window.devicePixelRatio || 1;
+    return Math.min(raw, coarsePointer ? 1.5 : 2);
+  }
+
+  function makeRafThrottle(fn) {
+    let id = 0;
+    return function () {
+      if (id) return;
+      id = requestAnimationFrame(() => { id = 0; fn(); });
+    };
+  }
+
+  return { getViewport, getDprCap, makeRafThrottle, coarsePointer };
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   // 1. Dynamic year in footer
   const yearSpan = document.getElementById('year');
@@ -1673,7 +1700,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const layoutW = driftCanvas.offsetWidth;
       const layoutH = driftCanvas.offsetHeight;
       if (layoutW === 0 || layoutH === 0) return;
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = _wcsViewport.getDprCap();
       W = (layoutW * dpr) | 0;
       H = (layoutH * dpr) | 0;
       driftCanvas.width = W;
@@ -1857,6 +1884,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Messengers render on a FIXED overlay canvas so they are not clipped by
   // the hero wrapper's overflow:hidden. The overlay only runs during the
   // handoff animation (no idle RAF).
+  // Uses visualViewport for iOS Safari correctness + locks sizing during flight.
   const approachTitle = document.querySelector('.approach-title');
   if (approachTitle && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     const hoCvs = document.createElement('canvas');
@@ -1865,17 +1893,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(hoCvs);
     const hoCtx = hoCvs.getContext('2d');
     let hoW = 0, hoH = 0, hoDpr = 1;
+    let hoFlying = false, hoPendingResize = false;
     const HCOLOR = [168, 85, 247]; // accent purple
 
     function hoResize() {
-      hoDpr = Math.min(window.devicePixelRatio || 1, 2);
-      hoW = (window.innerWidth * hoDpr) | 0;
-      hoH = (window.innerHeight * hoDpr) | 0;
+      if (hoFlying) { hoPendingResize = true; return; }
+      const vp = _wcsViewport.getViewport();
+      hoDpr = _wcsViewport.getDprCap();
+      hoW = Math.round(vp.vw * hoDpr);
+      hoH = Math.round(vp.vh * hoDpr);
       hoCvs.width = hoW;
       hoCvs.height = hoH;
     }
     hoResize();
-    window.addEventListener('resize', hoResize, { passive: true });
+    const hoResizeThrottled = _wcsViewport.makeRafThrottle(hoResize);
+    window.addEventListener('resize', hoResizeThrottled, { passive: true });
+    window.addEventListener('orientationchange', hoResizeThrottled, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', hoResizeThrottled, { passive: true });
+      window.visualViewport.addEventListener('scroll', hoResizeThrottled, { passive: true });
+    }
 
     let hoMsgs = [];
     let hoBursts = [];
@@ -1885,6 +1922,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function hoFire(sx, sy, tx, ty) {
       hoMsgs = [];
       hoBursts = [];
+      hoFlying = true;
       const now = performance.now();
       for (let i = 0; i < 18; i++) {
         const a = hoRnd(0, Math.PI * 2), d = hoRnd(5, 50) * hoDpr;
@@ -1963,9 +2001,12 @@ document.addEventListener('DOMContentLoaded', () => {
         hoRaf = requestAnimationFrame(hoLoop);
       } else {
         hoRaf = 0;
+        hoFlying = false;
         hoMsgs = [];
         hoBursts = [];
         hoCtx.clearRect(0, 0, hoW, hoH);
+        // Apply any resize that was deferred during flight
+        if (hoPendingResize) { hoPendingResize = false; hoResize(); }
       }
     }
 
@@ -1974,12 +2015,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (entry.isIntersecting && !handoffDone) {
         handoffDone = true;
         // One-shot rect reads — not in RAF
+        const vp = _wcsViewport.getViewport();
         const wr = videoWrapper.getBoundingClientRect();
         const tr = approachTitle.getBoundingClientRect();
-        const sx = (wr.left + wr.width / 2) * hoDpr;
-        const sy = (wr.bottom - 40) * hoDpr;
-        const tx = (tr.left + tr.width / 2) * hoDpr;
-        const ty = (tr.top + tr.height / 2) * hoDpr;
+        const sx = (wr.left + wr.width / 2 - vp.ox) * hoDpr;
+        const sy = (wr.bottom - 40 - vp.oy) * hoDpr;
+        const tx = (tr.left + tr.width / 2 - vp.ox) * hoDpr;
+        const ty = (tr.top + tr.height / 2 - vp.oy) * hoDpr;
         hoFire(sx, sy, tx, ty);
         // Purple pulse on heading after messengers arrive (color only, no glow)
         setTimeout(() => {

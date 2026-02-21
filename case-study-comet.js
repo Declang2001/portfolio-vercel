@@ -84,23 +84,43 @@
     return rects.length ? rects[0] : r.getBoundingClientRect();
   };
 
+  // ── Viewport helper (self-contained for this file) ──
+  const _vp = (() => {
+    const vv = window.visualViewport;
+    const coarse = window.matchMedia('(pointer: coarse)').matches
+      || !window.matchMedia('(hover: hover)').matches;
+    function get() {
+      if (vv) return { vw: vv.width, vh: vv.height, ox: vv.offsetLeft, oy: vv.offsetTop };
+      return { vw: window.innerWidth, vh: window.innerHeight, ox: 0, oy: 0 };
+    }
+    function dprCap() { return Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2); }
+    return { get, dprCap };
+  })();
+
   // ── Canvas setup ──
   const canvas = document.createElement('canvas');
   canvas.id = 'csAccentParticles';
-  canvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;opacity:0;transition:opacity .3s';
+  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9998;opacity:0;transition:opacity .3s';
   document.body.appendChild(canvas);
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  let dpr = window.devicePixelRatio || 1;
+  let dpr = _vp.dprCap();
 
   const resizeCanvas = () => {
-    dpr = window.devicePixelRatio || 1;
-    canvas.width  = window.innerWidth  * dpr;
-    canvas.height = window.innerHeight * dpr;
+    const vp = _vp.get();
+    dpr = _vp.dprCap();
+    canvas.width  = Math.round(vp.vw * dpr);
+    canvas.height = Math.round(vp.vh * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
   resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
+  let _rcRaf = 0;
+  const resizeThrottled = () => { if (!_rcRaf) _rcRaf = requestAnimationFrame(() => { _rcRaf = 0; resizeCanvas(); }); };
+  window.addEventListener('resize', resizeThrottled, { passive: true });
+  window.addEventListener('orientationchange', resizeThrottled, { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', resizeThrottled, { passive: true });
+  }
 
   // ── Stops ──
   // stop 0 = title, then meta, triad, media, tabs

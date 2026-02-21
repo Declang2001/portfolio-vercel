@@ -1,9 +1,13 @@
 // ── Octo Tether: drift cords + messenger particles on Work card hover ──
 // Self-contained. Index page only. No interference with comet or hover/tilt.
+// Disabled on touch devices (no hover) and when reduced motion is preferred.
 (() => {
   'use strict';
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // Skip on touch/no-hover devices — hover-only system has no purpose on mobile
+  if (window.matchMedia('(pointer: coarse)').matches
+    || !window.matchMedia('(hover: hover)').matches) return;
 
   // ── Source: the "work" link text inside the Work heading ──
   const srcEl = document.querySelector('#services .work-switch.is-active');
@@ -12,6 +16,17 @@
 
   const panels = grid.querySelectorAll('.comic-panel');
   if (!panels.length) return;
+
+  // ── Viewport helper (self-contained version for this file) ──
+  const _vp = (() => {
+    const vv = window.visualViewport;
+    function get() {
+      if (vv) return { vw: vv.width, vh: vv.height, ox: vv.offsetLeft, oy: vv.offsetTop };
+      return { vw: window.innerWidth, vh: window.innerHeight, ox: 0, oy: 0 };
+    }
+    function dprCap() { return Math.min(window.devicePixelRatio || 1, 2); }
+    return { get, dprCap };
+  })();
 
   // ── Canvas setup ──
   const canvas = document.createElement('canvas');
@@ -53,9 +68,10 @@
   const rnd = (a, b) => Math.random() * (b - a) + a;
 
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    W = (window.innerWidth * dpr) | 0;
-    H = (window.innerHeight * dpr) | 0;
+    const vp = _vp.get();
+    dpr = _vp.dprCap();
+    W = Math.round(vp.vw * dpr);
+    H = Math.round(vp.vh * dpr);
     canvas.width = W;
     canvas.height = H;
   }
@@ -65,10 +81,12 @@
   // ── Rect helpers (no per-frame reads) ──
   function getCenter(el) {
     const r = el.getBoundingClientRect();
-    return [(r.left + r.width / 2) * dpr, (r.top + r.height / 2) * dpr];
+    const vp = _vp.get();
+    return [(r.left + r.width / 2 - vp.ox) * dpr, (r.top + r.height / 2 - vp.oy) * dpr];
   }
 
   function borderAnchorsFromRect(rect, count) {
+    const vp = _vp.get();
     const pts = [];
     const w = rect.width, h = rect.height;
     const peri = 2 * (w + h);
@@ -86,7 +104,7 @@
       } else {
         x = rect.left; y = rect.bottom - (d - 2 * w - h);
       }
-      pts.push([x * dpr, y * dpr]);
+      pts.push([(x - vp.ox) * dpr, (y - vp.oy) * dpr]);
     }
     return pts;
   }
