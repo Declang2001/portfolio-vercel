@@ -2140,16 +2140,12 @@ body.services-active .services::before {
     margin-bottom: 3rem;
   }
 
-  /* --- Pinned scroll-driven horizontal rail --- */
+  /* --- Horizontal collage rail (native scroll) --- */
   .approach-page .collage-scroll-section {
     position: relative;
-    /* height set by JS: pinH + scrollDistance */
   }
 
   .approach-page .collage-scroll-pin {
-    position: sticky;
-    top: calc(var(--header-height) + 24px);
-    height: calc(100vh - var(--header-height) - 40px);
     display: flex;
     align-items: center;
     overflow: visible;
@@ -2159,7 +2155,7 @@ body.services-active .services::before {
     display: flex;
     gap: clamp(1.5rem, 2.5vw, 3rem);
     padding-inline: calc(clamp(1.5rem, 4vw, 4rem) + var(--railPadExtra, 0px));
-    overflow-x: hidden;
+    overflow-x: auto;
     overflow-y: visible;
     scroll-snap-type: none;
     scrollbar-width: none;

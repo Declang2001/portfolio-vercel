@@ -1295,7 +1295,7 @@ function initApproachVideoModal() {
 }
 
 
-// Pinned collage rail: vertical page scroll drives horizontal card advance (desktop only)
+// Collage rail: native horizontal scroller with 3D card transforms (desktop only)
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.body.classList.contains('approach-page')) return;
   initPinnedCollageScroll();
@@ -1311,11 +1311,6 @@ function initPinnedCollageScroll() {
   if (!section || !pin || !stack) return;
 
   const panels = stack.querySelectorAll('.collage-panel');
-  const endBufferPx = 260;
-
-  let scrollDistance = 0;
-  let startY = 0;
-  let topOffset = 0;
 
   function recalc() {
     if (!isDesktop()) {
@@ -1326,7 +1321,7 @@ function initPinnedCollageScroll() {
       return;
     }
 
-    // --- Start centering: compute extra left padding so first card is centered ---
+    // Center first card via extra left padding
     stack.style.setProperty('--railPadExtra', '0px');
     const basePadLeft = parseFloat(getComputedStyle(stack).paddingLeft) || 0;
     const firstPanel = panels[0];
@@ -1337,86 +1332,51 @@ function initPinnedCollageScroll() {
       stack.style.setProperty('--railPadExtra', extra + 'px');
     }
 
-    // Recompute after padding change
-    scrollDistance = Math.max(0, stack.scrollWidth - stack.clientWidth);
-
-    const topStr = getComputedStyle(pin).top || '0px';
-    topOffset = parseFloat(topStr) || 0;
-
-    const pinH = pin.getBoundingClientRect().height || 0;
-
-    // Extra vertical runway = scrollDistance + end buffer
-    section.style.height = (pinH + scrollDistance + endBufferPx) + 'px';
-
-    const sectionTop = section.getBoundingClientRect().top + window.scrollY;
-    startY = sectionTop - topOffset;
-
-    sync();
+    applyTransforms();
   }
 
+  // 3D card transforms driven by stack.scrollLeft
+  function applyTransforms() {
+    if (!isDesktop() || prefersReduced.matches) return;
+    const cx = stack.clientWidth / 2;
+    const range = stack.clientWidth * 0.6;
+    panels.forEach(p => {
+      const pcx = (p.offsetLeft - stack.scrollLeft) + (p.offsetWidth / 2);
+      const n = Math.max(-1, Math.min(1, (pcx - cx) / range));
+      const absN = Math.abs(n);
+      const ry = (-n * 10).toFixed(2);
+      const tz = (-absN * 90).toFixed(1);
+      const sc = (1 - absN * 0.05).toFixed(3);
+      const op = (1 - absN * 0.25).toFixed(3);
+      p.style.transform = `rotateY(${ry}deg) translateZ(${tz}px) scale(${sc})`;
+      p.style.opacity = op;
+    });
+  }
+
+  // RAF-throttled stack scroll → update transforms
   let ticking = false;
-  function sync() {
-    if (!isDesktop() || scrollDistance <= 0) return;
-
-    // Map vertical scroll to horizontal — clamp t to [0,1] using only scrollDistance
-    const raw = (window.scrollY - startY) / scrollDistance;
-    const t = Math.max(0, Math.min(1, raw));
-    stack.scrollLeft = t * scrollDistance;
-
-    // Subtle 3D card transforms (skip if reduced motion)
-    if (!prefersReduced.matches) {
-      const cx = stack.clientWidth / 2;
-      const range = stack.clientWidth * 0.6;
-      panels.forEach(p => {
-        const pcx = (p.offsetLeft - stack.scrollLeft) + (p.offsetWidth / 2);
-        const n = Math.max(-1, Math.min(1, (pcx - cx) / range));
-        const absN = Math.abs(n);
-        const ry = (-n * 10).toFixed(2);
-        const tz = (-absN * 90).toFixed(1);
-        const sc = (1 - absN * 0.05).toFixed(3);
-        const op = (1 - absN * 0.25).toFixed(3);
-        p.style.transform = `rotateY(${ry}deg) translateZ(${tz}px) scale(${sc})`;
-        p.style.opacity = op;
-      });
-    }
-  }
-
-  function onScroll() {
+  stack.addEventListener('scroll', () => {
     if (ticking) return;
     ticking = true;
-    requestAnimationFrame(() => { ticking = false; sync(); });
-  }
+    requestAnimationFrame(() => { ticking = false; applyTransforms(); });
+  }, { passive: true });
 
-  window.addEventListener('scroll', onScroll, { passive: true });
+  // Shift+wheel → horizontal scroll on stack
+  stack.addEventListener('wheel', (e) => {
+    if (!isDesktop()) return;
+    const hIntent = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    if (!hIntent) return;
+    e.preventDefault();
+    const scale = e.deltaMode === 1 ? 16 : 1;
+    const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
+    stack.scrollLeft += dx * scale;
+  }, { passive: false });
+
   window.addEventListener('resize', recalc);
-  // ResizeObserver catches content-driven size changes (images/videos loading)
   if (typeof ResizeObserver !== 'undefined') {
     new ResizeObserver(recalc).observe(stack);
   }
   window.addEventListener('load', recalc);
-
-  // Horizontal trackpad scroll → convert to vertical page scroll (with gain)
-  let hAccum = 0, hRaf = 0;
-  const H_SCROLL_GAIN = 2.2;
-
-  function flushH() {
-    hRaf = 0;
-    if (hAccum === 0) return;
-    window.scrollBy(0, hAccum);
-    hAccum = 0;
-  }
-
-  pin.addEventListener('wheel', (e) => {
-    if (!isDesktop() || scrollDistance <= 0) return;
-    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-    const currentT = (window.scrollY - startY) / scrollDistance;
-    if ((e.deltaX < 0 && currentT <= 0) || (e.deltaX > 0 && currentT >= 1)) return;
-    e.preventDefault();
-    const scale = e.deltaMode === 1 ? 16 : 1;
-    hAccum += e.deltaX * scale * H_SCROLL_GAIN;
-    if (!hRaf) hRaf = requestAnimationFrame(flushH);
-  }, { passive: false });
-
   recalc();
 }
 
