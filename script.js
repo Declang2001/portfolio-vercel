@@ -1395,16 +1395,26 @@ function initPinnedCollageScroll() {
   }
   window.addEventListener('load', recalc);
 
-  // Horizontal trackpad scroll → convert to vertical page scroll
+  // Horizontal trackpad scroll → convert to vertical page scroll (with gain)
+  let hAccum = 0, hRaf = 0;
+  const H_SCROLL_GAIN = 2.2;
+
+  function flushH() {
+    hRaf = 0;
+    if (hAccum === 0) return;
+    window.scrollBy(0, hAccum);
+    hAccum = 0;
+  }
+
   pin.addEventListener('wheel', (e) => {
     if (!isDesktop() || scrollDistance <= 0) return;
-    // Only handle horizontal gesture (|deltaX| > |deltaY|)
     if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-    // Don't trap at rail edges
     const currentT = (window.scrollY - startY) / scrollDistance;
     if ((e.deltaX < 0 && currentT <= 0) || (e.deltaX > 0 && currentT >= 1)) return;
     e.preventDefault();
-    window.scrollBy(0, e.deltaX);
+    const scale = e.deltaMode === 1 ? 16 : 1;
+    hAccum += e.deltaX * scale * H_SCROLL_GAIN;
+    if (!hRaf) hRaf = requestAnimationFrame(flushH);
   }, { passive: false });
 
   recalc();
@@ -1638,13 +1648,13 @@ document.addEventListener('DOMContentLoaded', () => {
       [68, 221, 255],  // cyan
       [204, 85, 255]   // soft magenta
     ];
-    const TRAIL_FADE   = 0.035;
-    const SPEED_MIN    = 0.4;
-    const SPEED_MAX    = 1.8;
-    const LIFE_MIN     = 200;
-    const LIFE_MAX     = 550;
-    const PTR_RADIUS   = 180;
-    const PTR_FORCE    = 0.04;
+    const TRAIL_FADE   = 0.025;
+    const SPEED_MIN    = 0.25;
+    const SPEED_MAX    = 1.2;
+    const LIFE_MIN     = 300;
+    const LIFE_MAX     = 700;
+    const PTR_RADIUS   = 280;
+    const PTR_FORCE    = 0.09;
     const SEED_COUNT   = 60;
     const SEED_FLY_MIN = 400;
     const SEED_FLY_MAX = 700;
@@ -1656,7 +1666,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let workRect = null;
     let seedFired = false;
     let reduced = false, staticDone = false;
-    let attractX = 0, attractY = 0, attractActive = false;
+    let ptrVel = 0;
+    let canvasRect = { left: 0, top: 0 };
 
     const rnd = (a, b) => Math.random() * (b - a) + a;
 
@@ -1684,13 +1695,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initPool() {
-      const count = Math.min(Math.max((W * H / 200) | 0, 2000), 8000);
+      const count = Math.min(Math.max((W * H / 250) | 0, 2000), 8000);
       particles = [];
       for (let i = 0; i < count; i++) {
         const p = spawn();
         p.ml = p.life;
         particles.push(p);
       }
+    }
+
+    function updateCanvasRect() {
+      const r = driftCanvas.getBoundingClientRect();
+      canvasRect = { left: r.left, top: r.top };
     }
 
     function doResize() {
@@ -1704,6 +1720,7 @@ document.addEventListener('DOMContentLoaded', () => {
       initPool();
       seeds = [];
       if (workAccent) workRect = workAccent.getBoundingClientRect();
+      updateCanvasRect();
       if (reduced && !staticDone) renderStaticFrame();
     }
 
@@ -1725,27 +1742,21 @@ document.addEventListener('DOMContentLoaded', () => {
         let vx = Math.cos(a) * p.spd;
         let vy = Math.sin(a) * p.spd;
 
-        // Pointer swirl
+        // Pointer interaction: swirl + direct attraction (velocity-scaled)
         const dx = p.x - ptrX, dy = p.y - ptrY;
         const d2 = dx * dx + dy * dy;
         if (d2 < PTR_RADIUS * PTR_RADIUS && d2 > 1) {
           const d = Math.sqrt(d2);
           const f = (1 - d / PTR_RADIUS) * PTR_FORCE;
-          const pa = Math.atan2(dy, dx) + 1.5708; // π/2
-          vx += Math.cos(pa) * f * (p.spd + 1);
-          vy += Math.sin(pa) * f * (p.spd + 1);
-        }
-
-        // Collect attractor (particle-to-text handoff)
-        if (attractActive) {
-          const ax = attractX - p.x, ay = attractY - p.y;
-          const ad2 = ax * ax + ay * ay;
-          if (ad2 > 1) {
-            const ad = Math.sqrt(ad2);
-            const af = Math.min(0.06, 300 / ad2);
-            vx += (ax / ad) * af * p.spd;
-            vy += (ay / ad) * af * p.spd;
-          }
+          const velScale = 1 + ptrVel * 0.05;
+          // Tangential swirl (perpendicular)
+          const pa = Math.atan2(dy, dx) + 1.5708;
+          vx += Math.cos(pa) * f * (p.spd + 1) * velScale * 0.6;
+          vy += Math.sin(pa) * f * (p.spd + 1) * velScale * 0.6;
+          // Direct attraction (toward cursor)
+          const ax = -dx / d, ay = -dy / d;
+          vx += ax * f * (p.spd + 1) * velScale * 0.5;
+          vy += ay * f * (p.spd + 1) * velScale * 0.5;
         }
 
         p.x += vx; p.y += vy;
@@ -1785,8 +1796,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const p = particles[i];
         const c = COLORS[p.ci];
         const fade = p.ml > 0 ? p.life / p.ml : 0;
-        ctx.lineWidth = 1 + (p.spd / SPEED_MAX) * 1.2;
-        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(fade * 0.6).toFixed(2)})`;
+        ctx.lineWidth = 1.5 + (p.spd / SPEED_MAX) * 1.5;
+        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(fade * 0.8).toFixed(2)})`;
         ctx.beginPath();
         ctx.moveTo(p.lx, p.ly);
         ctx.lineTo(p.x, p.y);
@@ -1802,17 +1813,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.moveTo(s.lx, s.ly);
         ctx.lineTo(s.x, s.y);
         ctx.stroke();
-      }
-
-      // Pointer glow
-      if (ptrX > 0 && ptrY > 0) {
-        const gr = PTR_RADIUS * 1.2;
-        const grad = ctx.createRadialGradient(ptrX, ptrY, 0, ptrX, ptrY, gr);
-        grad.addColorStop(0, `rgba(168,85,247,${(0.12 * intensity).toFixed(3)})`);
-        grad.addColorStop(0.5, `rgba(168,85,247,${(0.04 * intensity).toFixed(3)})`);
-        grad.addColorStop(1, 'rgba(168,85,247,0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(ptrX - gr, ptrY - gr, gr * 2, gr * 2);
       }
 
       ctx.restore();
@@ -1832,11 +1832,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function stop()  { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
 
     function onPtr(ev) {
-      const r = driftCanvas.getBoundingClientRect();
       const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
       const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
-      ptrX = (cx - r.left) * dpr;
-      ptrY = (cy - r.top) * dpr;
+      const nx = (cx - canvasRect.left) * dpr;
+      const ny = (cy - canvasRect.top) * dpr;
+      const ddx = nx - ptrX, ddy = ny - ptrY;
+      ptrVel = Math.min(Math.sqrt(ddx * ddx + ddy * ddy), 40);
+      ptrX = nx;
+      ptrY = ny;
     }
 
     return {
@@ -1845,8 +1848,8 @@ document.addEventListener('DOMContentLoaded', () => {
         reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         doResize();
         if (!reduced) {
-          driftCanvas.addEventListener('mousemove', onPtr, { passive: true });
-          driftCanvas.addEventListener('touchmove', onPtr, { passive: true });
+          window.addEventListener('mousemove', onPtr, { passive: true });
+          window.addEventListener('touchmove', onPtr, { passive: true });
         }
       },
 
@@ -1881,41 +1884,115 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       },
 
-      startCollect(tx, ty) {
-        attractX = tx * dpr;
-        attractY = ty * dpr;
-        attractActive = true;
-        setTimeout(() => { attractActive = false; }, 500);
-      },
-
+      updateRect: updateCanvasRect,
       onResize: doResize
     };
   })();
 
   drift.init();
 
-  // ── Particle-to-text handoff: "how the work comes together" glow ──
+  // ── Particle-to-text handoff: overlay messenger to heading ──
+  // Messengers render on a FIXED overlay canvas so they are not clipped by
+  // the hero wrapper's overflow:hidden. The overlay only runs during the
+  // handoff animation (no idle RAF).
   const approachTitle = document.querySelector('.approach-title');
   if (approachTitle && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    let handoffFired = false;
-    const titleObs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !handoffFired) {
-        handoffFired = true;
-        // Collect particles toward heading
-        const tr = approachTitle.getBoundingClientRect();
-        const cr = driftCanvas.getBoundingClientRect();
-        drift.startCollect(
-          (tr.left + tr.width / 2) - cr.left,
-          (tr.top + tr.height / 2) - cr.top
-        );
-        // Glow the heading
-        approachTitle.classList.add('approach-title--glow');
-        setTimeout(() => approachTitle.classList.remove('approach-title--glow'), 800);
+    const hoCvs = document.createElement('canvas');
+    hoCvs.setAttribute('aria-hidden', 'true');
+    hoCvs.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50;';
+    document.body.appendChild(hoCvs);
+    const hoCtx = hoCvs.getContext('2d');
+    let hoW = 0, hoH = 0, hoDpr = 1;
+    const HCOLOR = [168, 85, 247]; // accent purple
+
+    function hoResize() {
+      hoDpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      hoW = (window.innerWidth * hoDpr) | 0;
+      hoH = (window.innerHeight * hoDpr) | 0;
+      hoCvs.width = hoW;
+      hoCvs.height = hoH;
+    }
+    hoResize();
+    window.addEventListener('resize', hoResize, { passive: true });
+
+    let hoMsgs = [];
+    let hoRaf = 0;
+    const hoRnd = (a, b) => Math.random() * (b - a) + a;
+
+    function hoFire(sx, sy, tx, ty) {
+      hoMsgs = [];
+      const now = performance.now();
+      for (let i = 0; i < 14; i++) {
+        // Start from a spread around the source point
+        const a = hoRnd(0, Math.PI * 2), d = hoRnd(5, 40) * hoDpr;
+        const ox = sx + Math.cos(a) * d;
+        const oy = sy + Math.sin(a) * d;
+        hoMsgs.push({
+          x: ox, y: oy, lx: ox, ly: oy,
+          sx: ox, sy: oy, tx, ty,
+          st: now + hoRnd(0, 120),
+          dur: hoRnd(450, 800),
+          arrived: false
+        });
       }
-      if (!entry.isIntersecting && handoffFired) {
-        // Only reset if scrolled back above the hero
+      if (!hoRaf) hoRaf = requestAnimationFrame(hoLoop);
+    }
+
+    function hoLoop(now) {
+      hoCtx.clearRect(0, 0, hoW, hoH);
+      let allDone = true;
+      for (let i = 0; i < hoMsgs.length; i++) {
+        const m = hoMsgs[i];
+        if (m.arrived) continue;
+        const elapsed = now - m.st;
+        if (elapsed < 0) { allDone = false; continue; }
+        const t = Math.min(elapsed / m.dur, 1);
+        const e = 1 - (1 - t) * (1 - t) * (1 - t); // easeOutCubic
+        m.lx = m.x; m.ly = m.y;
+        m.x = m.sx + (m.tx - m.sx) * e;
+        m.y = m.sy + (m.ty - m.sy) * e;
+        if (t >= 1) { m.arrived = true; continue; }
+        allDone = false;
+        // Draw
+        const fade = 1 - t * 0.3; // slight fade near end
+        hoCtx.strokeStyle = `rgba(${HCOLOR[0]},${HCOLOR[1]},${HCOLOR[2]},${fade.toFixed(2)})`;
+        hoCtx.lineWidth = 3 * hoDpr;
+        hoCtx.beginPath();
+        hoCtx.moveTo(m.lx, m.ly);
+        hoCtx.lineTo(m.x, m.y);
+        hoCtx.stroke();
+      }
+      if (!allDone) {
+        hoRaf = requestAnimationFrame(hoLoop);
+      } else {
+        hoRaf = 0;
+        hoMsgs = [];
+        hoCtx.clearRect(0, 0, hoW, hoH);
+      }
+    }
+
+    let handoffDone = false;
+    const titleObs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !handoffDone) {
+        handoffDone = true;
+        // Compute source (bottom-center of hero wrapper) and target (heading center)
+        // One-shot rect reads — not in RAF
+        const wr = videoWrapper.getBoundingClientRect();
+        const tr = approachTitle.getBoundingClientRect();
+        const sx = (wr.left + wr.width / 2) * hoDpr;
+        const sy = (wr.bottom - 40) * hoDpr; // near bottom of hero
+        const tx = (tr.left + tr.width / 2) * hoDpr;
+        const ty = (tr.top + tr.height / 2) * hoDpr;
+        hoFire(sx, sy, tx, ty);
+        // Purple pulse on heading after messengers arrive (color only, no glow)
+        setTimeout(() => {
+          approachTitle.style.color = '#a855f7';
+          setTimeout(() => { approachTitle.style.color = ''; }, 900);
+        }, 650);
+      }
+      if (!entry.isIntersecting && handoffDone) {
         const heroBottom = approachHero.getBoundingClientRect().bottom;
-        if (heroBottom > window.innerHeight) handoffFired = false;
+        if (heroBottom > window.innerHeight) handoffDone = false;
       }
     }, { threshold: 0.5 });
     titleObs.observe(approachTitle);
@@ -1994,6 +2071,7 @@ document.addEventListener('DOMContentLoaded', () => {
     videoWrapper.style.opacity = String(e);
 
     // Drive drift canvas
+    drift.updateRect();
     drift.setIntensity(e);
     drift.checkSeedBurst(progress);
 

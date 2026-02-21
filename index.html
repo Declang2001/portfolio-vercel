@@ -22,13 +22,13 @@
 
       /* Align title container to same width as console */
       #skills .skills-showcase-inner {
-        max-width: 1200px;
+        max-width: min(1400px, 92vw);
       }
 
       #skills .skills-console {
-        max-width: 1200px;
+        max-width: min(1400px, 92vw);
         margin: 0 auto;
-        padding: 0 clamp(1.5rem, 7vw, 7rem);
+        padding: 0 clamp(1.5rem, 5vw, 5rem);
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -41,8 +41,9 @@
       /* ── Tabs: horizontal text row ── */
       #skills .skills-console-nav {
         display: flex;
+        flex-wrap: wrap;
         justify-content: center;
-        gap: clamp(1.2rem, 3vw, 2.5rem);
+        gap: clamp(0.6rem, 1.5vw, 1.2rem) clamp(1.2rem, 3vw, 2.5rem);
         padding: 0;
         border: none;
         border-radius: 0;
@@ -262,66 +263,79 @@
           <div class="skills-console" data-skills-console>
             <div class="skills-console-nav" role="tablist" aria-label="skill categories">
               <button id="skills-tab-design" role="tab" aria-controls="skills-panel-design" aria-selected="true" tabindex="0">design</button>
+              <button id="skills-tab-brand" role="tab" aria-controls="skills-panel-brand" aria-selected="false" tabindex="-1">brand</button>
               <button id="skills-tab-motion" role="tab" aria-controls="skills-panel-motion" aria-selected="false" tabindex="-1">motion</button>
-              <button id="skills-tab-creative" role="tab" aria-controls="skills-panel-creative" aria-selected="false" tabindex="-1">creative dev</button>
+              <button id="skills-tab-video" role="tab" aria-controls="skills-panel-video" aria-selected="false" tabindex="-1">video</button>
+              <button id="skills-tab-dev" role="tab" aria-controls="skills-panel-dev" aria-selected="false" tabindex="-1">dev</button>
               <button id="skills-tab-tools" role="tab" aria-controls="skills-panel-tools" aria-selected="false" tabindex="-1">tools</button>
             </div>
             <div class="skills-console-panels">
               <div id="skills-panel-design" role="tabpanel" aria-labelledby="skills-tab-design">
                 <div class="skills-card-grid">
-                  <button class="skills-card" type="button"><span>brand systems</span></button>
-                  <button class="skills-card" type="button"><span>visual identity</span></button>
                   <button class="skills-card" type="button"><span>typography</span></button>
                   <button class="skills-card" type="button"><span>layout design</span></button>
-                  <button class="skills-card" type="button"><span>marketing design</span></button>
-                  <button class="skills-card" type="button"><span>social content design</span></button>
+                  <button class="skills-card" type="button"><span>ui visual design</span></button>
                   <button class="skills-card" type="button"><span>web visual design</span></button>
+                  <button class="skills-card" type="button"><span>icon design</span></button>
                   <button class="skills-card" type="button"><span>illustration</span></button>
                   <button class="skills-card" type="button"><span>vector illustration</span></button>
+                  <button class="skills-card" type="button"><span>digital illustration</span></button>
+                  <button class="skills-card" type="button"><span>social content design</span></button>
+                  <button class="skills-card" type="button"><span>marketing design</span></button>
+                </div>
+              </div>
+              <div id="skills-panel-brand" role="tabpanel" aria-labelledby="skills-tab-brand" hidden>
+                <div class="skills-card-grid">
+                  <button class="skills-card" type="button"><span>brand systems</span></button>
+                  <button class="skills-card" type="button"><span>visual identity</span></button>
                   <button class="skills-card" type="button"><span>merch graphics</span></button>
                   <button class="skills-card" type="button"><span>style guides</span></button>
-                  <button class="skills-card" type="button"><span>print-ready files</span></button>
-                  <button class="skills-card" type="button"><span>icon design</span></button>
                   <button class="skills-card" type="button"><span>presentation design</span></button>
-                  <button class="skills-card" type="button"><span>ui visual design</span></button>
+                  <button class="skills-card" type="button"><span>print-ready files</span></button>
                 </div>
               </div>
               <div id="skills-panel-motion" role="tabpanel" aria-labelledby="skills-tab-motion" hidden>
                 <div class="skills-card-grid">
                   <button class="skills-card" type="button"><span>motion graphics</span></button>
-                  <button class="skills-card" type="button"><span>video editing</span></button>
                   <button class="skills-card" type="button"><span>logo animation</span></button>
                   <button class="skills-card" type="button"><span>kinetic typography</span></button>
-                  <button class="skills-card" type="button"><span>timing + easing</span></button>
+                  <button class="skills-card" type="button"><span>keyframing</span></button>
+                  <button class="skills-card" type="button"><span>timing and easing</span></button>
                   <button class="skills-card" type="button"><span>masking</span></button>
                   <button class="skills-card" type="button"><span>track mattes</span></button>
                   <button class="skills-card" type="button"><span>looping animations</span></button>
+                  <button class="skills-card" type="button"><span>motion polish pass</span></button>
                   <button class="skills-card" type="button"><span>compositing</span></button>
+                </div>
+              </div>
+              <div id="skills-panel-video" role="tabpanel" aria-labelledby="skills-tab-video" hidden>
+                <div class="skills-card-grid">
+                  <button class="skills-card" type="button"><span>video editing</span></button>
                   <button class="skills-card" type="button"><span>transition design</span></button>
                   <button class="skills-card" type="button"><span>basic color correction</span></button>
                   <button class="skills-card" type="button"><span>sound-sync editing</span></button>
                   <button class="skills-card" type="button"><span>export delivery specs</span></button>
                   <button class="skills-card" type="button"><span>rotoscoping basics</span></button>
-                  <button class="skills-card" type="button"><span>motion polish pass</span></button>
                 </div>
               </div>
-              <div id="skills-panel-creative" role="tabpanel" aria-labelledby="skills-tab-creative" hidden>
+              <div id="skills-panel-dev" role="tabpanel" aria-labelledby="skills-tab-dev" hidden>
                 <div class="skills-card-grid">
                   <button class="skills-card" type="button"><span>html</span></button>
                   <button class="skills-card" type="button"><span>css</span></button>
                   <button class="skills-card" type="button"><span>javascript</span></button>
                   <button class="skills-card" type="button"><span>responsive layouts</span></button>
                   <button class="skills-card" type="button"><span>dom scripting</span></button>
-                  <button class="skills-card" type="button"><span>shopify liquid</span></button>
-                  <button class="skills-card" type="button"><span>theme section builds</span></button>
-                  <button class="skills-card" type="button"><span>interactive ui effects</span></button>
-                  <button class="skills-card" type="button"><span>dawn customization</span></button>
+                  <button class="skills-card" type="button"><span>css animations</span></button>
                   <button class="skills-card" type="button"><span>canvas animation</span></button>
-                  <button class="skills-card" type="button"><span>vite builds</span></button>
+                  <button class="skills-card" type="button"><span>interactive ui effects</span></button>
                   <button class="skills-card" type="button"><span>three.js basics</span></button>
+                  <button class="skills-card" type="button"><span>vite builds</span></button>
                   <button class="skills-card" type="button"><span>git workflows</span></button>
                   <button class="skills-card" type="button"><span>vercel deploys</span></button>
                   <button class="skills-card" type="button"><span>cloudinary integration</span></button>
+                  <button class="skills-card" type="button"><span>shopify liquid</span></button>
+                  <button class="skills-card" type="button"><span>dawn customization</span></button>
+                  <button class="skills-card" type="button"><span>theme section builds</span></button>
                 </div>
               </div>
               <div id="skills-panel-tools" role="tabpanel" aria-labelledby="skills-tab-tools" hidden>
@@ -331,7 +345,7 @@
                   <button class="skills-card" type="button"><span>illustrator</span></button>
                   <button class="skills-card" type="button"><span>photoshop</span></button>
                   <button class="skills-card" type="button"><span>figma</span></button>
-                  <button class="skills-card" type="button"><span>blender (basic)</span></button>
+                  <button class="skills-card" type="button"><span>blender</span></button>
                   <button class="skills-card" type="button"><span>shopify admin</span></button>
                   <button class="skills-card" type="button"><span>vs code</span></button>
                   <button class="skills-card" type="button"><span>github</span></button>
@@ -339,7 +353,7 @@
                   <button class="skills-card" type="button"><span>vercel</span></button>
                   <button class="skills-card" type="button"><span>cloudinary</span></button>
                   <button class="skills-card" type="button"><span>chatgpt</span></button>
-                  <button class="skills-card" type="button"><span>gemini</span></button>
+                  <button class="skills-card" type="button"><span>google gemini</span></button>
                   <button class="skills-card" type="button"><span>kling</span></button>
                   <button class="skills-card" type="button"><span>claude code</span></button>
                 </div>
@@ -475,6 +489,8 @@
             const isActive = panel.id === tab.getAttribute('aria-controls');
             panel.hidden = !isActive;
           });
+          // Recache comet stop positions after panel height change
+          requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
         };
 
         tabs.forEach((tab, index) => {
@@ -496,5 +512,6 @@
       })();
     </script>
     <script src="script.js"></script>
+    <script src="index-work-tethers.js" defer></script>
   </body>
 </html>
