@@ -280,6 +280,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const HYSTERESIS     = 40;    // px scroll margin to prevent jitter retrigger
     const PREVIEW_DURATION = 400; // ms for skills hover preview comet
     const SPARKLE_CHANCE = 0.10;  // 10% chance per spawn iteration for micro sparkle
+    const IDLE_ARM_MS    = 1200;  // ms of no interaction before idle attract starts
+    const IDLE_DWELL_MS  = 1400;  // ms pause between idle hops
 
     // --- DOM refs ---
     const sourceEl     = heroSection.querySelector('.hero-line-bottom .accent');
@@ -381,6 +383,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Skills hover preview ──
     let previewMode      = false;
     let previewReturnIdx = -1;
+
+    // ── Work zone tease state ──
+    let lastUserActionTs  = performance.now();
+    let workInView        = false;
+    let workTeaseDone     = false;
+    let workTeaseRunning  = false;
+    let workTeaseTimer    = null;
 
     // ── Queued navigation (click-to-stop) ──
     let navMode  = false;
@@ -735,6 +744,8 @@ document.addEventListener('DOMContentLoaded', () => {
       accentScrollTicking = false;
       if (!accentInited) return;
 
+      lastUserActionTs = performance.now();
+
       // Cancel preview on scroll
       if (previewMode) {
         previewMode = false;
@@ -790,6 +801,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       launchComet(cFrom, targetStop);
       currentStopIdx = targetStop;
+
+      // One-time tease: arm or disarm based on new stop
+      if (targetStop === workIdxForIdle && workInView) {
+        armWorkTease();
+      } else {
+        stopWorkTease();
+      }
     };
 
     const requestAccentTick = () => {
@@ -871,6 +889,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Approach hover hop handlers ──
     const startApproachHop = () => {
       if (!accentInited) return;
+      lastUserActionTs = performance.now();
+      stopWorkTease();
       if (prefersReducedHero) {
         if (approachEl) approachEl.style.setProperty('--flow-p', '1');
         return;
@@ -880,12 +900,61 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const endApproachHop = () => {
+      lastUserActionTs = performance.now();
       if (prefersReducedHero) {
         if (approachEl) approachEl.style.setProperty('--flow-p', '0');
         return;
       }
       // If forward hop is still in flight, let it finish — the reverse will fire from end state
       launchHop(true);
+      // Re-arm idle attract after user leaves
+      const wIdx = STOPS.findIndex(s => s.id === 'work');
+      if (workInView && currentStopIdx === wIdx) armWorkTease();
+    };
+
+    // ── One-time work zone tease: Work → Approach → Work ──
+    const workIdxForIdle = STOPS.findIndex(s => s.id === 'work');
+
+    const teaseGateOk = () => {
+      return workInView
+        && currentStopIdx === workIdxForIdle
+        && !workTeaseDone
+        && !workTeaseRunning
+        && !prefersReducedHero
+        && !previewMode
+        && !navMode
+        && !cometActive
+        && !hopActive
+        && (performance.now() - lastUserActionTs) > IDLE_ARM_MS;
+    };
+
+    const stopWorkTease = () => {
+      workTeaseRunning = false;
+      clearTimeout(workTeaseTimer);
+      workTeaseTimer = null;
+      if (approachEl && !hopActive) {
+        approachEl.style.setProperty('--flow-p', '0');
+      }
+    };
+
+    const armWorkTease = () => {
+      if (prefersReducedHero || workTeaseDone) return;
+      stopWorkTease();
+      workTeaseTimer = setTimeout(fireWorkTease, IDLE_DWELL_MS);
+    };
+
+    const fireWorkTease = () => {
+      if (!teaseGateOk()) return;
+      workTeaseRunning = true;
+      launchHop(false); // Work → Approach
+      workTeaseTimer = setTimeout(() => {
+        if (!workTeaseRunning) return;
+        launchHop(true); // Approach → Work
+        workTeaseTimer = setTimeout(() => {
+          workTeaseRunning = false;
+          workTeaseDone = true;
+        }, HOP_DURATION);
+      }, HOP_DURATION + IDLE_DWELL_MS);
     };
 
     // ── Initialize ──
@@ -917,6 +986,29 @@ document.addEventListener('DOMContentLoaded', () => {
         skillsWrap.addEventListener('pointerenter', startSkillsPreview);
         skillsWrap.addEventListener('pointerleave', endSkillsPreview);
         skillsWrap.addEventListener('click', onSkillsClick);
+      }
+
+      // Idle attract: observe work zone visibility
+      if (workIdxForIdle >= 0) {
+        const servicesSection = document.getElementById('services');
+        if (servicesSection) {
+          const workObs = new IntersectionObserver(([entry]) => {
+            workInView = entry.isIntersecting;
+            if (workInView && currentStopIdx === workIdxForIdle) {
+              workTeaseDone = false; // reset on re-entry
+              armWorkTease();
+            } else {
+              stopWorkTease();
+            }
+          }, { threshold: 0.1 });
+          workObs.observe(servicesSection);
+        }
+
+        if (workEl) {
+          const workLink = workEl.closest('a') || workEl;
+          workLink.addEventListener('pointerenter', () => { lastUserActionTs = performance.now(); stopWorkTease(); });
+          workLink.addEventListener('pointermove', () => { lastUserActionTs = performance.now(); }, { passive: true });
+        }
       }
 
       accentInited = true;
@@ -1302,6 +1394,19 @@ function initPinnedCollageScroll() {
     new ResizeObserver(recalc).observe(stack);
   }
   window.addEventListener('load', recalc);
+
+  // Horizontal trackpad scroll → convert to vertical page scroll
+  pin.addEventListener('wheel', (e) => {
+    if (!isDesktop() || scrollDistance <= 0) return;
+    // Only handle horizontal gesture (|deltaX| > |deltaY|)
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    // Don't trap at rail edges
+    const currentT = (window.scrollY - startY) / scrollDistance;
+    if ((e.deltaX < 0 && currentT <= 0) || (e.deltaX > 0 && currentT >= 1)) return;
+    e.preventDefault();
+    window.scrollBy(0, e.deltaX);
+  }, { passive: false });
+
   recalc();
 }
 
@@ -1509,7 +1614,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// Approach page hero: match home hero text drift + mid-screen fade, while video eases in
+// Approach page hero: match home hero text drift + mid-screen fade, while drift canvas eases in
 document.addEventListener('DOMContentLoaded', () => {
   const approachHero = document.querySelector('.hero.hero--approach');
   if (!approachHero) return;
@@ -1517,28 +1622,303 @@ document.addEventListener('DOMContentLoaded', () => {
   const topLine = approachHero.querySelector('.hero-line-top');
   const bottomLine = approachHero.querySelector('.hero-line-bottom');
   const videoWrapper = approachHero.querySelector('.approach-hero-video-wrapper');
-  const heroVideo = approachHero.querySelector('.approach-hero-video-frame video');
+  const driftCanvas = document.getElementById('approachDriftCanvas');
+  const workAccent = approachHero.querySelector('.hero-line-bottom .accent');
 
-  if (!topLine || !bottomLine || !videoWrapper) return;
+  if (!topLine || !bottomLine || !videoWrapper || !driftCanvas) return;
 
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
   const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
-  // Ensure intro.mp4 tries to play
-  if (heroVideo) {
-    heroVideo.muted = true;
-    heroVideo.preload = 'auto';
-    heroVideo.setAttribute('playsinline', '');
-    heroVideo.setAttribute('webkit-playsinline', '');
+  // ── Drift engine ──
+  const drift = (() => {
+    const COLORS = [
+      [168, 85, 247],  // accent purple
+      [68, 136, 255],  // blue
+      [68, 221, 255],  // cyan
+      [204, 85, 255]   // soft magenta
+    ];
+    const TRAIL_FADE   = 0.035;
+    const SPEED_MIN    = 0.4;
+    const SPEED_MAX    = 1.8;
+    const LIFE_MIN     = 200;
+    const LIFE_MAX     = 550;
+    const PTR_RADIUS   = 180;
+    const PTR_FORCE    = 0.04;
+    const SEED_COUNT   = 60;
+    const SEED_FLY_MIN = 400;
+    const SEED_FLY_MAX = 700;
 
-    const tryPlay = () => {
-      const p = heroVideo.play();
-      if (p && p.catch) p.catch(() => {});
+    let ctx, W = 0, H = 0, dpr = 1;
+    let particles = [], seeds = [];
+    let raf = 0, intensity = 0;
+    let ptrX = -9999, ptrY = -9999;
+    let workRect = null;
+    let seedFired = false;
+    let reduced = false, staticDone = false;
+    let attractX = 0, attractY = 0, attractActive = false;
+
+    const rnd = (a, b) => Math.random() * (b - a) + a;
+
+    // 4-octave sin/cos pseudo-noise field
+    function fieldAngle(x, y, t) {
+      const nx = x / W, ny = y / H;
+      const s = t * 0.0003;
+      return (
+        Math.sin(nx * 2.1 + s * 0.5) + Math.cos(ny * 2.3 + s * 0.3)
+        + (Math.sin(nx * 4.7 + s * 0.7) + Math.cos(ny * 4.3 + s * 0.4)) * 0.5
+        + (Math.sin(nx * 8.3 - s * 0.2) + Math.cos(ny * 7.9 - s * 0.15)) * 0.25
+        + (Math.sin(nx * 12.1 + ny * 3.7 + s * 0.9)) * 0.15
+      ) * Math.PI;
+    }
+
+    function spawn(x, y) {
+      const px = x ?? rnd(0, W), py = y ?? rnd(0, H);
+      return {
+        x: px, y: py, lx: px, ly: py,
+        spd: rnd(SPEED_MIN, SPEED_MAX),
+        ci: (Math.random() * COLORS.length) | 0,
+        life: (rnd(LIFE_MIN, LIFE_MAX)) | 0,
+        ml: 0
+      };
+    }
+
+    function initPool() {
+      const count = Math.min(Math.max((W * H / 200) | 0, 2000), 8000);
+      particles = [];
+      for (let i = 0; i < count; i++) {
+        const p = spawn();
+        p.ml = p.life;
+        particles.push(p);
+      }
+    }
+
+    function doResize() {
+      const r = driftCanvas.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return;
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      W = (r.width * dpr) | 0;
+      H = (r.height * dpr) | 0;
+      driftCanvas.width = W;
+      driftCanvas.height = H;
+      initPool();
+      seeds = [];
+      if (workAccent) workRect = workAccent.getBoundingClientRect();
+      if (reduced && !staticDone) renderStaticFrame();
+    }
+
+    function renderStaticFrame() {
+      if (!ctx || W === 0) return;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+      for (let f = 0; f < 60; f++) updateParticles(f * 16);
+      renderFrame();
+      staticDone = true;
+    }
+
+    function updateParticles(time) {
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.lx = p.x; p.ly = p.y;
+
+        const a = fieldAngle(p.x, p.y, time);
+        let vx = Math.cos(a) * p.spd;
+        let vy = Math.sin(a) * p.spd;
+
+        // Pointer swirl
+        const dx = p.x - ptrX, dy = p.y - ptrY;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < PTR_RADIUS * PTR_RADIUS && d2 > 1) {
+          const d = Math.sqrt(d2);
+          const f = (1 - d / PTR_RADIUS) * PTR_FORCE;
+          const pa = Math.atan2(dy, dx) + 1.5708; // π/2
+          vx += Math.cos(pa) * f * (p.spd + 1);
+          vy += Math.sin(pa) * f * (p.spd + 1);
+        }
+
+        // Collect attractor (particle-to-text handoff)
+        if (attractActive) {
+          const ax = attractX - p.x, ay = attractY - p.y;
+          const ad2 = ax * ax + ay * ay;
+          if (ad2 > 1) {
+            const ad = Math.sqrt(ad2);
+            const af = Math.min(0.06, 300 / ad2);
+            vx += (ax / ad) * af * p.spd;
+            vy += (ay / ad) * af * p.spd;
+          }
+        }
+
+        p.x += vx; p.y += vy;
+        p.life--;
+
+        if (p.life <= 0 || p.x < 0 || p.x > W || p.y < 0 || p.y > H) {
+          const n = spawn();
+          p.x = n.x; p.y = n.y; p.lx = n.lx; p.ly = n.ly;
+          p.spd = n.spd; p.ci = n.ci; p.life = n.life; p.ml = n.life;
+        }
+      }
+    }
+
+    function updateSeeds(now) {
+      for (let i = seeds.length - 1; i >= 0; i--) {
+        const s = seeds[i];
+        const t = Math.min((now - s.st) / s.dur, 1);
+        const e = 1 - (1 - t) * (1 - t) * (1 - t); // easeOutCubic
+        s.lx = s.x; s.ly = s.y;
+        s.x += (s.tx - s.x) * e * 0.08;
+        s.y += (s.ty - s.y) * e * 0.08;
+        if (t >= 1) {
+          const p = spawn(s.x, s.y);
+          p.ci = s.ci; p.ml = p.life;
+          particles.push(p);
+          seeds.splice(i, 1);
+        }
+      }
+    }
+
+    function renderFrame() {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = intensity || 1;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        const c = COLORS[p.ci];
+        const fade = p.ml > 0 ? p.life / p.ml : 0;
+        ctx.lineWidth = 1 + (p.spd / SPEED_MAX) * 1.2;
+        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(fade * 0.6).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.moveTo(p.lx, p.ly);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < seeds.length; i++) {
+        const s = seeds[i];
+        const c = COLORS[s.ci];
+        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},0.9)`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(s.lx, s.ly);
+        ctx.lineTo(s.x, s.y);
+        ctx.stroke();
+      }
+
+      // Pointer glow
+      if (ptrX > 0 && ptrY > 0) {
+        const gr = PTR_RADIUS * 1.2;
+        const grad = ctx.createRadialGradient(ptrX, ptrY, 0, ptrX, ptrY, gr);
+        grad.addColorStop(0, `rgba(168,85,247,${(0.12 * intensity).toFixed(3)})`);
+        grad.addColorStop(0.5, `rgba(168,85,247,${(0.04 * intensity).toFixed(3)})`);
+        grad.addColorStop(1, 'rgba(168,85,247,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(ptrX - gr, ptrY - gr, gr * 2, gr * 2);
+      }
+
+      ctx.restore();
+    }
+
+    function loop() {
+      const now = performance.now();
+      ctx.fillStyle = `rgba(0,0,0,${TRAIL_FADE})`;
+      ctx.fillRect(0, 0, W, H);
+      updateParticles(now);
+      updateSeeds(now);
+      renderFrame();
+      raf = requestAnimationFrame(loop);
+    }
+
+    function start() { if (!raf && !reduced) raf = requestAnimationFrame(loop); }
+    function stop()  { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+
+    function onPtr(ev) {
+      const r = driftCanvas.getBoundingClientRect();
+      const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
+      ptrX = (cx - r.left) * dpr;
+      ptrY = (cy - r.top) * dpr;
+    }
+
+    return {
+      init() {
+        ctx = driftCanvas.getContext('2d');
+        reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        doResize();
+        if (!reduced) {
+          driftCanvas.addEventListener('mousemove', onPtr, { passive: true });
+          driftCanvas.addEventListener('touchmove', onPtr, { passive: true });
+        }
+      },
+
+      setIntensity(v) {
+        intensity = v;
+        if (v > 0) start(); else stop();
+      },
+
+      checkSeedBurst(progress) {
+        if (reduced) return;
+        if (progress >= 0.35 && !seedFired) {
+          if (!workRect) return;
+          const cr = driftCanvas.getBoundingClientRect();
+          const cx = ((workRect.left + workRect.width / 2) - cr.left) * dpr;
+          const cy = ((workRect.top + workRect.height / 2) - cr.top) * dpr;
+          const tx = W / 2, ty = H / 2;
+          seeds = [];
+          for (let i = 0; i < SEED_COUNT; i++) {
+            const a = rnd(0, Math.PI * 2), d = rnd(5, 25);
+            seeds.push({
+              x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d,
+              lx: cx, ly: cy, tx, ty,
+              st: performance.now(), dur: rnd(SEED_FLY_MIN, SEED_FLY_MAX),
+              ci: (Math.random() * COLORS.length) | 0
+            });
+          }
+          seedFired = true;
+        }
+        if (progress < 0.2 && seedFired) {
+          seedFired = false;
+          seeds = [];
+        }
+      },
+
+      startCollect(tx, ty) {
+        attractX = tx * dpr;
+        attractY = ty * dpr;
+        attractActive = true;
+        setTimeout(() => { attractActive = false; }, 500);
+      },
+
+      onResize: doResize
     };
+  })();
 
-    tryPlay();
-    window.addEventListener('scroll', tryPlay, { once: true, passive: true });
-    document.addEventListener('touchstart', tryPlay, { once: true, passive: true });
+  drift.init();
+
+  // ── Particle-to-text handoff: "how the work comes together" glow ──
+  const approachTitle = document.querySelector('.approach-title');
+  if (approachTitle && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    let handoffFired = false;
+    const titleObs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !handoffFired) {
+        handoffFired = true;
+        // Collect particles toward heading
+        const tr = approachTitle.getBoundingClientRect();
+        const cr = driftCanvas.getBoundingClientRect();
+        drift.startCollect(
+          (tr.left + tr.width / 2) - cr.left,
+          (tr.top + tr.height / 2) - cr.top
+        );
+        // Glow the heading
+        approachTitle.classList.add('approach-title--glow');
+        setTimeout(() => approachTitle.classList.remove('approach-title--glow'), 800);
+      }
+      if (!entry.isIntersecting && handoffFired) {
+        // Only reset if scrolled back above the hero
+        const heroBottom = approachHero.getBoundingClientRect().bottom;
+        if (heroBottom > window.innerHeight) handoffFired = false;
+      }
+    }, { threshold: 0.5 });
+    titleObs.observe(approachTitle);
   }
 
   let ticking = false;
@@ -1596,7 +1976,7 @@ document.addEventListener('DOMContentLoaded', () => {
       line.style.opacity = String(opacity);
     });
 
-    // VIDEO stays driven by the full approach hero scroll range (unchanged)
+    // Drift wrapper stays driven by the full approach hero scroll range
     const appearStart = 0.35;
     const appearEnd = 0.9;
     let t = (progress - appearStart) / (appearEnd - appearStart);
@@ -1613,6 +1993,10 @@ document.addEventListener('DOMContentLoaded', () => {
     videoWrapper.style.transform = `translate3d(-50%, -50%, 0) scale3d(${scale}, ${scale}, 1)`;
     videoWrapper.style.opacity = String(e);
 
+    // Drive drift canvas
+    drift.setIntensity(e);
+    drift.checkSeedBurst(progress);
+
     ticking = false;
   }
 
@@ -1627,6 +2011,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('scroll', requestTick, { passive: true });
   window.addEventListener('resize', () => {
     lastProgress = -1;
+    drift.onResize();
     update();
   });
 });
