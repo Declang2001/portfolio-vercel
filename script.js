@@ -619,15 +619,18 @@ function initPinnedCollageScroll() {
 }
 
 
-// WORK COLLAGE — lazy-load, hover-to-play, splice builder, hover-centering (index page)
+// WORK COLLAGE — lazy-load, autoplay, focus mode, press/release (index page)
 document.addEventListener('DOMContentLoaded', () => {
-  const panels = document.querySelectorAll('.comic-panel');
+  const grid = document.getElementById('workCollageGrid');
+  if (!grid) return;
+
+  const panels = grid.querySelectorAll('.comic-panel');
   if (!panels.length) return;
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  // --- Lazy-load video sources via IntersectionObserver ---
+  // --- Lazy-load video sources via IntersectionObserver + autoplay ---
   const loadVideo = (video) => {
     const sources = video.querySelectorAll('source[data-src]');
     let swapped = false;
@@ -637,18 +640,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (swapped) { video.preload = 'metadata'; video.load(); }
   };
 
-  // Load a clone's sources from the master video's resolved src
-  const loadClone = (clone, master) => {
-    const masterSrc = master.querySelector('source');
-    if (!masterSrc || !masterSrc.src) return;
-    const cloneSrc = clone.querySelector('source');
-    if (cloneSrc && !cloneSrc.src) {
-      cloneSrc.src = masterSrc.src;
-      clone.preload = 'metadata';
-      clone.load();
-    }
-  };
-
   if ('IntersectionObserver' in window) {
     const obs = new IntersectionObserver((entries, o) => {
       entries.forEach((e) => {
@@ -656,10 +647,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const v = e.target.querySelector('.comic-panel-video > video');
         if (v) {
           loadVideo(v);
-          // When master loads, propagate src to clones
-          v.addEventListener('loadedmetadata', () => {
-            const clones = e.target.querySelectorAll('.splice-slice video');
-            clones.forEach((c) => loadClone(c, v));
+          v.addEventListener('canplay', () => {
+            v.muted = true;
+            v.play().catch(() => {});
           }, { once: true });
         }
         o.unobserve(e.target);
@@ -673,120 +663,162 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- Build real splice structure for panels with video or image (desktop only) ---
+  // --- Apple Card Tilt + Focus Mode (desktop pointer-fine only) ---
   if (canHover && !prefersReduced) {
-    panels.forEach((panel) => {
-      const mediaBox = panel.querySelector('.comic-panel-video');
-      const masterVideo = mediaBox ? mediaBox.querySelector('video') : null;
-      const masterImg = mediaBox ? mediaBox.querySelector('img') : null;
-      const master = masterVideo || masterImg;
-      if (!master) return;
+    let activePanel = null;
+    let rafId = 0;
+    let lastX = 0;
+    let lastY = 0;
 
-      const wrap = document.createElement('div');
-      wrap.className = 'splice-wrap';
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-      const bgPositions = { left: '0% 0%', mid: '50% 0%', right: '100% 0%' };
+    const resetVars = (panel) => {
+      panel.style.setProperty('--tiltX', '0deg');
+      panel.style.setProperty('--tiltY', '0deg');
+      panel.style.setProperty('--mediaX', '0px');
+      panel.style.setProperty('--mediaY', '0px');
+      panel.style.setProperty('--mx', '50%');
+      panel.style.setProperty('--my', '50%');
+    };
 
-      ['left', 'mid', 'right'].forEach((pos) => {
-        const slice = document.createElement('div');
-        slice.className = 'splice-slice splice-slice--' + pos;
-        if (masterVideo) {
-          const clone = master.cloneNode(true);
-          // Clear src on clones — they get it when master loads
-          clone.querySelectorAll('source').forEach((s) => {
-            if (s.dataset.src) { s.removeAttribute('src'); }
-          });
-          clone.removeAttribute('preload');
-          slice.appendChild(clone);
-        } else {
-          // Image: use background-image so all 3 slices share one seamless image
-          const url = masterImg.currentSrc || masterImg.src;
-          slice.style.backgroundImage = `url("${url}")`;
-          slice.style.backgroundRepeat = 'no-repeat';
-          slice.style.backgroundSize = '300% 100%';
-          slice.style.backgroundPosition = bgPositions[pos];
-        }
-        wrap.appendChild(slice);
-      });
+    const clearAll = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      if (activePanel) {
+        activePanel.classList.remove('is-active');
+        resetVars(activePanel);
+        activePanel = null;
+      }
+      grid.classList.remove('is-dimming');
+      grid.querySelectorAll('.is-pressed').forEach((p) => p.classList.remove('is-pressed'));
+    };
 
-      mediaBox.appendChild(wrap);
-      panel.classList.add('has-splice');
+    const setActive = (panel) => {
+      if (activePanel === panel) return;
+      if (activePanel) {
+        activePanel.classList.remove('is-active');
+        resetVars(activePanel);
+      }
+      activePanel = panel;
+      panel.classList.add('is-active');
+      grid.classList.add('is-dimming');
+    };
 
-      // If master is a video with src loaded, propagate to clones now
-      if (masterVideo) {
-        const masterSrc = master.querySelector('source');
-        if (masterSrc && masterSrc.src) {
-          wrap.querySelectorAll('.splice-slice video').forEach((c) => loadClone(c, master));
-        }
+    // pointermove: find panel under cursor, update tilt + parallax per frame
+    grid.addEventListener('pointermove', (e) => {
+      // Use elementFromPoint for reliability with nested elements
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const panel = el ? el.closest('.comic-panel') : null;
+
+      if (!panel || !grid.contains(panel)) {
+        clearAll();
+        return;
+      }
+
+      setActive(panel);
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      if (!rafId) {
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          if (!activePanel) return;
+
+          const rect = activePanel.getBoundingClientRect();
+          // Normalized -0.5 to 0.5
+          const nx = (lastX - rect.left) / rect.width - 0.5;
+          const ny = (lastY - rect.top) / rect.height - 0.5;
+
+          const tiltY = clamp(nx * 6, -4, 4);
+          const tiltX = clamp(-ny * 6, -4, 4);
+          const mediaX = clamp(nx * 10, -6, 6);
+          const mediaY = clamp(ny * 10, -6, 6);
+          const mx = ((nx + 0.5) * 100).toFixed(1);
+          const my = ((ny + 0.5) * 100).toFixed(1);
+
+          activePanel.style.setProperty('--tiltX', tiltX.toFixed(2) + 'deg');
+          activePanel.style.setProperty('--tiltY', tiltY.toFixed(2) + 'deg');
+          activePanel.style.setProperty('--mediaX', mediaX.toFixed(1) + 'px');
+          activePanel.style.setProperty('--mediaY', mediaY.toFixed(1) + 'px');
+          activePanel.style.setProperty('--mx', mx + '%');
+          activePanel.style.setProperty('--my', my + '%');
+        });
       }
     });
-  }
 
-  // --- Desktop: play on hover with splice sync ---
-  if (canHover) {
-    panels.forEach((panel) => {
-      const master = panel.querySelector('.comic-panel-video > video');
-      if (!master) return;
+    // pointerleave on grid — clear everything
+    grid.addEventListener('pointerleave', clearAll);
 
-      const clones = Array.from(panel.querySelectorAll('.splice-slice video'));
-      let syncRaf = 0;
+    // Scroll cancel
+    window.addEventListener('scroll', () => {
+      if (activePanel) clearAll();
+    }, { passive: true });
 
-      // RAF loop: keep clones synced to master
-      const syncLoop = () => {
-        const t = master.currentTime;
-        clones.forEach((c) => {
-          if (Math.abs(c.currentTime - t) > 0.03) c.currentTime = t;
-        });
-        syncRaf = requestAnimationFrame(syncLoop);
-      };
+    // Keyboard focus
+    grid.addEventListener('focusin', (e) => {
+      const panel = e.target.closest('.comic-panel');
+      if (panel) setActive(panel);
+    });
+    grid.addEventListener('focusout', (e) => {
+      if (!grid.contains(e.relatedTarget)) clearAll();
+    });
 
-      panel.addEventListener('mouseenter', () => {
-        master.muted = true;
-        master.play().catch(() => {});
-        // Play + sync clones
-        clones.forEach((c) => {
-          c.muted = true;
-          c.currentTime = master.currentTime;
-          c.play().catch(() => {});
-        });
-        if (clones.length) syncRaf = requestAnimationFrame(syncLoop);
-      });
+  } else if (canHover && prefersReduced) {
+    // Reduced motion: simple dim only, no tilt
+    let activePanel = null;
 
-      panel.addEventListener('mouseleave', () => {
-        master.pause();
-        clones.forEach((c) => c.pause());
-        if (syncRaf) { cancelAnimationFrame(syncRaf); syncRaf = 0; }
-      });
+    const clearAll = () => {
+      if (activePanel) {
+        activePanel.classList.remove('is-active');
+        activePanel = null;
+      }
+      grid.classList.remove('is-dimming');
+      grid.querySelectorAll('.is-pressed').forEach((p) => p.classList.remove('is-pressed'));
+    };
+
+    grid.addEventListener('pointermove', (e) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const panel = el ? el.closest('.comic-panel') : null;
+      if (!panel || !grid.contains(panel)) { clearAll(); return; }
+      if (activePanel === panel) return;
+      if (activePanel) activePanel.classList.remove('is-active');
+      activePanel = panel;
+      panel.classList.add('is-active');
+      grid.classList.add('is-dimming');
+    });
+
+    grid.addEventListener('pointerleave', clearAll);
+    window.addEventListener('scroll', () => { if (activePanel) clearAll(); }, { passive: true });
+    grid.addEventListener('focusin', (e) => {
+      const panel = e.target.closest('.comic-panel');
+      if (panel) {
+        if (activePanel && activePanel !== panel) activePanel.classList.remove('is-active');
+        activePanel = panel;
+        panel.classList.add('is-active');
+        grid.classList.add('is-dimming');
+      }
+    });
+    grid.addEventListener('focusout', (e) => {
+      if (!grid.contains(e.relatedTarget)) clearAll();
     });
   }
 
-  // --- Hover-centering: move focused panel toward viewport center ---
-  if (canHover) {
-    panels.forEach((panel) => {
-      panel.addEventListener('mouseenter', () => {
-        const rect = panel.getBoundingClientRect();
-        const panelCx = rect.left + rect.width / 2;
-        const panelCy = rect.top + rect.height / 2;
-        const vpCx = window.innerWidth / 2;
-        const vpCy = window.innerHeight / 2;
-        const dx = (vpCx - panelCx) * 0.35;
-        const dy = (vpCy - panelCy) * 0.25;
-        panel.style.setProperty('--hx', dx.toFixed(1) + 'px');
-        panel.style.setProperty('--hy', dy.toFixed(1) + 'px');
-        panel.style.setProperty('--hs', '1.14');
-        panel.classList.add('is-focus');
-        document.body.classList.add('work-panel-active');
-      });
+  // --- Press/Release (all devices, delegated on grid) ---
+  grid.addEventListener('pointerdown', (e) => {
+    const panel = e.target.closest('.comic-panel');
+    if (panel) panel.classList.add('is-pressed');
+  });
 
-      panel.addEventListener('mouseleave', () => {
-        panel.style.setProperty('--hx', '0px');
-        panel.style.setProperty('--hy', '0px');
-        panel.style.setProperty('--hs', '1');
-        panel.classList.remove('is-focus');
-        document.body.classList.remove('work-panel-active');
-      });
-    });
-  }
+  grid.addEventListener('pointerup', () => {
+    grid.querySelectorAll('.is-pressed').forEach((p) => p.classList.remove('is-pressed'));
+  });
+
+  grid.addEventListener('pointercancel', () => {
+    grid.querySelectorAll('.is-pressed').forEach((p) => p.classList.remove('is-pressed'));
+  });
+
+  grid.addEventListener('click', () => {
+    grid.querySelectorAll('.is-pressed').forEach((p) => p.classList.remove('is-pressed'));
+  });
 });
 
 
