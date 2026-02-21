@@ -1653,8 +1653,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const SPEED_MAX    = 1.2;
     const LIFE_MIN     = 300;
     const LIFE_MAX     = 700;
-    const PTR_RADIUS   = 280;
-    const PTR_FORCE    = 0.09;
+    const PTR_RADIUS   = 320;
+    const PTR_FORCE    = 0.14;
     const SEED_COUNT   = 60;
     const SEED_FLY_MIN = 400;
     const SEED_FLY_MAX = 700;
@@ -1667,7 +1667,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let seedFired = false;
     let reduced = false, staticDone = false;
     let ptrVel = 0;
-    let canvasRect = { left: 0, top: 0 };
+    let canvasRect = { left: 0, top: 0, width: 0, height: 0 };
 
     const rnd = (a, b) => Math.random() * (b - a) + a;
 
@@ -1695,7 +1695,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initPool() {
-      const count = Math.min(Math.max((W * H / 250) | 0, 2000), 8000);
+      const count = Math.min(Math.max((W * H / 400) | 0, 2000), 8000);
       particles = [];
       for (let i = 0; i < count; i++) {
         const p = spawn();
@@ -1706,15 +1706,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateCanvasRect() {
       const r = driftCanvas.getBoundingClientRect();
-      canvasRect = { left: r.left, top: r.top };
+      canvasRect = { left: r.left, top: r.top, width: r.width, height: r.height };
     }
 
     function doResize() {
-      const r = driftCanvas.getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) return;
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      W = (r.width * dpr) | 0;
-      H = (r.height * dpr) | 0;
+      const layoutW = driftCanvas.offsetWidth;
+      const layoutH = driftCanvas.offsetHeight;
+      if (layoutW === 0 || layoutH === 0) return;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = (layoutW * dpr) | 0;
+      H = (layoutH * dpr) | 0;
       driftCanvas.width = W;
       driftCanvas.height = H;
       initPool();
@@ -1796,7 +1797,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const p = particles[i];
         const c = COLORS[p.ci];
         const fade = p.ml > 0 ? p.life / p.ml : 0;
-        ctx.lineWidth = 1.5 + (p.spd / SPEED_MAX) * 1.5;
+        ctx.lineWidth = 1.2 + (p.spd / SPEED_MAX) * 1.3;
         ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(fade * 0.8).toFixed(2)})`;
         ctx.beginPath();
         ctx.moveTo(p.lx, p.ly);
@@ -1834,8 +1835,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function onPtr(ev) {
       const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
       const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
-      const nx = (cx - canvasRect.left) * dpr;
-      const ny = (cy - canvasRect.top) * dpr;
+      if (canvasRect.width <= 0 || canvasRect.height <= 0) return;
+      const nx = ((cx - canvasRect.left) / canvasRect.width) * W;
+      const ny = ((cy - canvasRect.top) / canvasRect.height) * H;
       const ddx = nx - ptrX, ddy = ny - ptrY;
       ptrVel = Math.min(Math.sqrt(ddx * ddx + ddy * ddy), 40);
       ptrX = nx;
@@ -1906,7 +1908,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const HCOLOR = [168, 85, 247]; // accent purple
 
     function hoResize() {
-      hoDpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      hoDpr = Math.min(window.devicePixelRatio || 1, 2);
       hoW = (window.innerWidth * hoDpr) | 0;
       hoH = (window.innerHeight * hoDpr) | 0;
       hoCvs.width = hoW;
@@ -1916,23 +1918,25 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', hoResize, { passive: true });
 
     let hoMsgs = [];
+    let hoBursts = [];
     let hoRaf = 0;
     const hoRnd = (a, b) => Math.random() * (b - a) + a;
 
     function hoFire(sx, sy, tx, ty) {
       hoMsgs = [];
+      hoBursts = [];
       const now = performance.now();
-      for (let i = 0; i < 14; i++) {
-        // Start from a spread around the source point
-        const a = hoRnd(0, Math.PI * 2), d = hoRnd(5, 40) * hoDpr;
+      for (let i = 0; i < 18; i++) {
+        const a = hoRnd(0, Math.PI * 2), d = hoRnd(5, 50) * hoDpr;
         const ox = sx + Math.cos(a) * d;
         const oy = sy + Math.sin(a) * d;
         hoMsgs.push({
           x: ox, y: oy, lx: ox, ly: oy,
           sx: ox, sy: oy, tx, ty,
-          st: now + hoRnd(0, 120),
-          dur: hoRnd(450, 800),
-          arrived: false
+          st: now + hoRnd(0, 150),
+          dur: hoRnd(550, 950),
+          arrived: false,
+          burstFired: false
         });
       }
       if (!hoRaf) hoRaf = requestAnimationFrame(hoLoop);
@@ -1941,32 +1945,66 @@ document.addEventListener('DOMContentLoaded', () => {
     function hoLoop(now) {
       hoCtx.clearRect(0, 0, hoW, hoH);
       let allDone = true;
+
+      // Update + draw messengers
       for (let i = 0; i < hoMsgs.length; i++) {
         const m = hoMsgs[i];
-        if (m.arrived) continue;
+        if (m.arrived) {
+          if (!m.burstFired) {
+            m.burstFired = true;
+            for (let j = 0; j < 5; j++) {
+              const ba = hoRnd(0, Math.PI * 2);
+              const bspd = hoRnd(1, 3) * hoDpr;
+              hoBursts.push({
+                x: m.tx, y: m.ty,
+                vx: Math.cos(ba) * bspd, vy: Math.sin(ba) * bspd,
+                st: now, life: hoRnd(180, 280)
+              });
+            }
+          }
+          continue;
+        }
         const elapsed = now - m.st;
         if (elapsed < 0) { allDone = false; continue; }
         const t = Math.min(elapsed / m.dur, 1);
-        const e = 1 - (1 - t) * (1 - t) * (1 - t); // easeOutCubic
+        const e = 1 - (1 - t) * (1 - t) * (1 - t);
         m.lx = m.x; m.ly = m.y;
         m.x = m.sx + (m.tx - m.sx) * e;
         m.y = m.sy + (m.ty - m.sy) * e;
-        if (t >= 1) { m.arrived = true; continue; }
+        if (t >= 1) { m.arrived = true; allDone = false; continue; }
         allDone = false;
-        // Draw
-        const fade = 1 - t * 0.3; // slight fade near end
+        const fade = 1 - t * 0.2;
         hoCtx.strokeStyle = `rgba(${HCOLOR[0]},${HCOLOR[1]},${HCOLOR[2]},${fade.toFixed(2)})`;
-        hoCtx.lineWidth = 3 * hoDpr;
+        hoCtx.lineWidth = 3.5 * hoDpr;
         hoCtx.beginPath();
         hoCtx.moveTo(m.lx, m.ly);
         hoCtx.lineTo(m.x, m.y);
         hoCtx.stroke();
       }
+
+      // Update + draw contact bursts
+      for (let i = hoBursts.length - 1; i >= 0; i--) {
+        const b = hoBursts[i];
+        const age = now - b.st;
+        if (age > b.life) { hoBursts.splice(i, 1); continue; }
+        b.x += b.vx; b.y += b.vy;
+        b.vx *= 0.9; b.vy *= 0.9;
+        const bfade = 1 - age / b.life;
+        hoCtx.strokeStyle = `rgba(${HCOLOR[0]},${HCOLOR[1]},${HCOLOR[2]},${(bfade * 0.85).toFixed(2)})`;
+        hoCtx.lineWidth = 2 * hoDpr;
+        hoCtx.beginPath();
+        hoCtx.moveTo(b.x - b.vx * 3, b.y - b.vy * 3);
+        hoCtx.lineTo(b.x, b.y);
+        hoCtx.stroke();
+        allDone = false;
+      }
+
       if (!allDone) {
         hoRaf = requestAnimationFrame(hoLoop);
       } else {
         hoRaf = 0;
         hoMsgs = [];
+        hoBursts = [];
         hoCtx.clearRect(0, 0, hoW, hoH);
       }
     }
@@ -1975,12 +2013,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleObs = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && !handoffDone) {
         handoffDone = true;
-        // Compute source (bottom-center of hero wrapper) and target (heading center)
         // One-shot rect reads — not in RAF
         const wr = videoWrapper.getBoundingClientRect();
         const tr = approachTitle.getBoundingClientRect();
         const sx = (wr.left + wr.width / 2) * hoDpr;
-        const sy = (wr.bottom - 40) * hoDpr; // near bottom of hero
+        const sy = (wr.bottom - 40) * hoDpr;
         const tx = (tr.left + tr.width / 2) * hoDpr;
         const ty = (tr.top + tr.height / 2) * hoDpr;
         hoFire(sx, sy, tx, ty);
@@ -1988,7 +2025,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
           approachTitle.style.color = '#a855f7';
           setTimeout(() => { approachTitle.style.color = ''; }, 900);
-        }, 650);
+        }, 750);
       }
       if (!entry.isIntersecting && handoffDone) {
         const heroBottom = approachHero.getBoundingClientRect().bottom;
