@@ -15,6 +15,7 @@
   --cs-motif-opacity: 0.045;
   --cs-max: 1200px;
   --cs-pad: clamp(1.5rem, 5vw, 4rem);
+  --cs-block-gap: clamp(1.25rem, 3vh, 2.25rem);
 }
 
 /* ── Root wrapper ── */
@@ -50,7 +51,7 @@
    ============================================================ */
 .cs-hero {
   padding-top: clamp(10rem, 22vh, 16rem);
-  padding-bottom: clamp(3rem, 6vh, 5.2rem);
+  padding-bottom: var(--cs-block-gap);
   text-align: center;
 }
 
@@ -235,13 +236,13 @@
 }
 
 /* ============================================================
-   TRIAD (the ask / my role / output)
+   TRIAD (goal / contribution / result)
    ============================================================ */
 .cs-triad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: clamp(0.8rem, 1.5vw, 1.2rem);
-  padding: clamp(0.6rem, 1.4vh, 1.1rem) 0 clamp(1.5rem, 3vh, 2.5rem);
+  padding: var(--cs-block-gap) 0;
   border-top: none;
   border-bottom: none;
 }
@@ -320,7 +321,7 @@
    GALLERY (3-up clickable media)
    ============================================================ */
 .cs-gallery {
-  padding: clamp(2rem, 4vh, 3.5rem) 0;
+  padding: var(--cs-block-gap) 0;
 }
 
 .cs-gallery-grid {
