@@ -2131,6 +2131,8 @@ body.services-active .services::before {
   }
 }
 
+.collage-edge-nav { display: none; }
+
 @media (min-width: 1200px) {
   :root {
     --wcs-header-height: var(--header-height);
@@ -2248,6 +2250,7 @@ body.services-active .services::before {
 
   /* --- Collage edge nav --- */
   .collage-edge-nav {
+    display: block;
     position: absolute;
     inset: 0;
     pointer-events: none;
@@ -2258,7 +2261,7 @@ body.services-active .services::before {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    pointer-events: auto;
+    pointer-events: none;
     width: 44px;
     height: 44px;
     border-radius: 50%;
@@ -2282,6 +2285,7 @@ body.services-active .services::before {
   #collageScrollPin:hover .collage-edge-btn,
   .collage-edge-btn:focus-visible {
     opacity: 1;
+    pointer-events: auto;
   }
 
   .collage-edge-btn:hover {
