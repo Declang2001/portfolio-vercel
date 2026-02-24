@@ -3080,7 +3080,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const highlightsEl = document.getElementById('journeyHighlights');
   const skipBtn   = document.getElementById('jSkip');
   const resumeBtn = document.getElementById('jResume');
-  const workBtn   = document.getElementById('jWork');
+  const replayCtaBtn   = document.getElementById('jReplayCta');
+  const navWorkBtn     = document.getElementById('jNavWork');
+  const navApproachBtn = document.getElementById('jNavApproach');
   if (!cvs) return;
 
   const ctx = cvs.getContext('2d');
@@ -3195,18 +3197,20 @@ document.addEventListener('DOMContentLoaded', () => {
     resumeEl.hidden = false; highlightsEl.hidden = false;
     var scrollTarget = (resumeEl.offsetTop||0) - 80;
     window.scrollTo(0, Math.max(0, scrollTarget));
-    if (resumeBtn) resumeBtn.textContent = 'tunnel run';
-    if (skipBtn)   skipBtn.hidden = true;
-    if (workBtn) workBtn.hidden = false;
+    if (resumeBtn)      resumeBtn.hidden = true;
+    if (skipBtn)        skipBtn.hidden = true;
+    if (navWorkBtn)     navWorkBtn.hidden = false;
+    if (navApproachBtn) navApproachBtn.hidden = false;
   }
   function showTunnelMode() {
     isTunnelMode = true;
     resumeEl.hidden = true; highlightsEl.hidden = true;
     cvs.hidden = false; cvs.style.transition = ''; cvs.style.opacity = '1';
     hideCard(); done = false;
-    if (resumeBtn) resumeBtn.textContent = 'resume mode';
-    if (skipBtn)   skipBtn.hidden = false;
-    if (workBtn) workBtn.hidden = true;
+    if (resumeBtn)      { resumeBtn.textContent = 'resume mode'; resumeBtn.hidden = false; }
+    if (skipBtn)        skipBtn.hidden = false;
+    if (navWorkBtn)     navWorkBtn.hidden = true;
+    if (navApproachBtn) navApproachBtn.hidden = true;
     initTunnel(); startAnim();
   }
   function endAnimation() { done = true; showResumeMode(); }
@@ -3444,7 +3448,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (resumeBtn) resumeBtn.addEventListener('click', function() {
     if (isTunnelMode) showResumeMode(); else showTunnelMode();
   });
-  // workBtn is a plain <a href> — no JS listener needed
+  if (replayCtaBtn) replayCtaBtn.addEventListener('click', showTunnelMode);
 
   document.addEventListener('click', function() {
     if (!isTunnelMode || done) return;
@@ -3460,8 +3464,11 @@ document.addEventListener('DOMContentLoaded', () => {
     cvs.hidden = true;
     resumeEl.hidden = false; highlightsEl.hidden = false;
     isTunnelMode = false;
-    if (skipBtn)   skipBtn.hidden = true;
-    if (resumeBtn) resumeBtn.textContent = 'tunnel run';
+    if (skipBtn)        skipBtn.hidden = true;
+    if (resumeBtn)      resumeBtn.hidden = true;
+    if (replayCtaBtn)   replayCtaBtn.hidden = true;
+    if (navWorkBtn)     navWorkBtn.hidden = false;
+    if (navApproachBtn) navApproachBtn.hidden = false;
   } else {
     initTunnel();
     startAnim();
