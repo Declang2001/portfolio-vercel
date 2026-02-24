@@ -37,10 +37,11 @@
   let fadeAlpha = 0, fadeDir = 0, startTime = 0;
   let srcPts = [], srcSeeds = [], anchors = [], filaments = [], bursts = [];
   let tetherRGB = FALLBACK_RGB.slice();
-  let tiltEl = null, tiltLocalW = 0, tiltLocalH = 0;
-  let panelRect = null, tiltOffset = [0, 0], tiltOrigin = [0, 0];
+  let targetEl = null, targetLocalW = 0, targetLocalH = 0;
+  let transformEl = null, transformOrigin = [0, 0];
+  let panelRect = null, targetOffset = [0, 0], targetInTransform = [0, 0];
   let lastTiltUpdateAt = 0;
-  let tiltCandidates = [];
+  let transformCandidates = [];
 
   const rnd = (a, b) => Math.random() * (b - a) + a;
 
@@ -136,85 +137,104 @@
     list.push(el);
   }
 
-  function buildTiltCandidates(panel) {
+  function pickTargetElement(panel) {
+    const media = panel.querySelector('video, img');
+    const preferred = panel.querySelector('.comic-panel-video')
+      || panel.querySelector('[class*="comic-panel-video"]')
+      || (media && media.closest('.comic-panel-video'))
+      || (media && media.parentElement)
+      || media
+      || panel;
+    return preferred;
+  }
+
+  function buildTransformCandidates(panel, target) {
     const list = [];
     addCandidate(list, panel);
-    const kids = panel.children;
-    for (let i = 0; i < kids.length && i < 6; i++) addCandidate(list, kids[i]);
-    const first = panel.firstElementChild;
-    if (first) {
-      addCandidate(list, first);
-      addCandidate(list, first.firstElementChild);
-      addCandidate(list, first.lastElementChild);
+    let cur = target;
+    while (cur && cur !== panel) {
+      addCandidate(list, cur);
+      cur = cur.parentElement;
     }
+    addCandidate(list, panel.firstElementChild);
+    addCandidate(list, panel.lastElementChild);
     return list;
   }
 
-  function chooseTiltElement(panel, t0, t1) {
-    for (let i = 0; i < tiltCandidates.length; i++) {
-      const el = tiltCandidates[i];
+  function chooseTransformElement(panel, target, t0, t1) {
+    for (let i = 0; i < transformCandidates.length; i++) {
+      const el = transformCandidates[i];
       const a = t0.get(el) || 'none';
       const b = t1.get(el) || 'none';
       if (a !== b) return el;
     }
+    if ((t1.get(target) || 'none') !== 'none') return target;
     if ((t1.get(panel) || 'none') !== 'none') return panel;
-    for (let i = 0; i < tiltCandidates.length; i++) {
-      const el = tiltCandidates[i];
+    for (let i = 0; i < transformCandidates.length; i++) {
+      const el = transformCandidates[i];
       if ((t1.get(el) || 'none') !== 'none') return el;
     }
-    return panel;
+    return target || panel;
   }
 
   function sampleCandidateTransforms() {
     const map = new Map();
-    for (let i = 0; i < tiltCandidates.length; i++) {
-      const el = tiltCandidates[i];
+    for (let i = 0; i < transformCandidates.length; i++) {
+      const el = transformCandidates[i];
       map.set(el, getComputedStyle(el).transform || 'none');
     }
     return map;
   }
 
-  function primeTiltElement(panel) {
-    tiltCandidates = buildTiltCandidates(panel);
+  function primeTransformElement(panel, target) {
+    transformCandidates = buildTransformCandidates(panel, target);
     const s0 = sampleCandidateTransforms();
     requestAnimationFrame(() => {
       if (activePanel !== panel) return;
       const s1 = sampleCandidateTransforms();
-      tiltEl = chooseTiltElement(panel, s0, s1);
-      refreshTiltCache();
-      updateAnchorsFromTilt();
+      transformEl = chooseTransformElement(panel, target, s0, s1);
+      refreshTransformCache();
+      updateAnchorsFromTransform();
     });
   }
 
-  function refreshTiltCache() {
-    if (!tiltEl || !activePanel) return;
-    tiltLocalW = tiltEl.offsetWidth || 0;
-    tiltLocalH = tiltEl.offsetHeight || 0;
+  function refreshTransformCache() {
+    if (!transformEl || !targetEl || !activePanel) return;
+    const targetRect = targetEl.getBoundingClientRect();
+    const transformRect = transformEl.getBoundingClientRect();
     panelRect = activePanel.getBoundingClientRect();
-    const tiltRect = tiltEl.getBoundingClientRect();
-    tiltOffset = [tiltRect.left - panelRect.left, tiltRect.top - panelRect.top];
-    tiltOrigin = readOriginPx(tiltEl, tiltLocalW, tiltLocalH);
+    targetOffset = [targetRect.left - panelRect.left, targetRect.top - panelRect.top];
+    targetInTransform = [targetRect.left - transformRect.left, targetRect.top - transformRect.top];
+    targetLocalW = targetEl.offsetWidth || targetRect.width || 0;
+    targetLocalH = targetEl.offsetHeight || targetRect.height || 0;
+    const tw = transformEl.offsetWidth || transformRect.width || 0;
+    const th = transformEl.offsetHeight || transformRect.height || 0;
+    transformOrigin = readOriginPx(transformEl, tw, th);
   }
 
   function projectLocalPoint(localX, localY) {
-    if (!tiltEl || !panelRect) return null;
-    const tf = getComputedStyle(tiltEl).transform;
+    if (!transformEl || !panelRect) return null;
+    const tf = getComputedStyle(transformEl).transform;
     const m = (!tf || tf === 'none') ? new DOMMatrix() : new DOMMatrix(tf);
-    const ox = tiltOrigin[0], oy = tiltOrigin[1];
-    const p = new DOMPoint(localX - ox, localY - oy, 0, 1).matrixTransform(m);
+    const ox = transformOrigin[0], oy = transformOrigin[1];
+    const tx = targetInTransform[0] + localX;
+    const ty = targetInTransform[1] + localY;
+    const p = new DOMPoint(tx - ox, ty - oy, 0, 1).matrixTransform(m);
     const w = (p.w && Number.isFinite(p.w) && p.w !== 0) ? p.w : 1;
-    return [panelRect.left + tiltOffset[0] + (p.x / w) + ox,
-            panelRect.top  + tiltOffset[1] + (p.y / w) + oy];
+    const projectedLocalX = (p.x / w) + ox - targetInTransform[0];
+    const projectedLocalY = (p.y / w) + oy - targetInTransform[1];
+    return [panelRect.left + targetOffset[0] + projectedLocalX,
+            panelRect.top  + targetOffset[1] + projectedLocalY];
   }
 
-  function updateAnchorsFromTilt() {
-    if (!tiltEl || !panelRect || tiltLocalW <= 0 || tiltLocalH <= 0) return;
+  function updateAnchorsFromTransform() {
+    if (!transformEl || !targetEl || !panelRect || targetLocalW <= 0 || targetLocalH <= 0) return;
     const inset = 1.5;
     const localPts = [
       [inset, inset],                              // top-left
-      [Math.max(inset, tiltLocalW - inset), inset], // top-right
-      [Math.max(inset, tiltLocalW - inset), Math.max(inset, tiltLocalH - inset)], // bottom-right
-      [inset, Math.max(inset, tiltLocalH - inset)], // bottom-left
+      [Math.max(inset, targetLocalW - inset), inset], // top-right
+      [Math.max(inset, targetLocalW - inset), Math.max(inset, targetLocalH - inset)], // bottom-right
+      [inset, Math.max(inset, targetLocalH - inset)], // bottom-left
     ];
     anchors = localPts.map((pt) => {
       const projected = projectLocalPoint(pt[0], pt[1]);
@@ -226,8 +246,8 @@
   function recomputeRects() {
     if (!activePanel) return;
     remapSourcePoints();
-    refreshTiltCache();
-    updateAnchorsFromTilt();
+    refreshTransformCache();
+    updateAnchorsFromTransform();
   }
   let scrollTick = 0;
   const scheduleRecompute = () => {
@@ -325,7 +345,7 @@
         : fadeAlpha;
     if (activePanel && now - lastTiltUpdateAt >= 33) {
       lastTiltUpdateAt = now;
-      updateAnchorsFromTilt();
+      updateAnchorsFromTransform();
     }
     const elapsed = (now - startTime) * 0.001;
     if (fadeAlpha > 0 && anchors.length > 0) {
@@ -358,14 +378,15 @@
   panels.forEach((panel) => {
     panel.addEventListener('pointerenter', () => {
       activePanel = panel;
-      tiltEl = panel;
+      targetEl = pickTargetElement(panel);
+      transformEl = targetEl;
       lastTiltUpdateAt = 0;
       srcSeeds = buildSourceSeeds(MAIN_COUNT + MICRO_COUNT);
       captureTetherRGB();
-      refreshTiltCache();
+      refreshTransformCache();
       remapSourcePoints();
-      updateAnchorsFromTilt();
-      primeTiltElement(panel);
+      updateAnchorsFromTransform();
+      primeTransformElement(panel, targetEl);
       buildFilaments();
       fadeDir = 1; startTime = performance.now();
       if (!raf) raf = requestAnimationFrame(render);
@@ -374,15 +395,16 @@
 
     panel.addEventListener('pointermove', () => {
       if (activePanel !== panel) return;
-      updateAnchorsFromTilt();
+      updateAnchorsFromTransform();
     }, { passive: true });
 
     panel.addEventListener('pointerleave', () => {
       if (activePanel === panel) {
         activePanel = null;
-        tiltEl = null;
+        targetEl = null;
+        transformEl = null;
         panelRect = null;
-        tiltCandidates = [];
+        transformCandidates = [];
         fadeDir = -1;
       }
       if (!raf) raf = requestAnimationFrame(render);

@@ -2426,7 +2426,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const panels = document.querySelectorAll('#collageStack .collage-panel');
   if (!srcEl || !panels.length) return;
 
-  const FALLBACK_RGB2 = [168, 85, 247];
+  const WHITE_RGB2 = [255, 255, 255];
+  const FALLBACK_PURPLE_RGB2 = [168, 85, 247];
   const MAIN_N = 4, MICRO_N = 2;
 
   const vv = window.visualViewport;
@@ -2451,7 +2452,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
   let startTime2 = 0, activePanel2 = null;
   let srcPts2 = [], srcSeeds2 = [], anchors2 = [], fils2 = [], bursts2 = [];
-  let tetherRGB2 = FALLBACK_RGB2.slice();
+  let purpleRGB2 = FALLBACK_PURPLE_RGB2.slice();
+  let tetherRGB2 = WHITE_RGB2.slice();
+  let tileHot2 = false;
+  let panelRO2 = null;
   const rnd2 = (a, b) => Math.random() * (b - a) + a;
 
   function parseColorToRGB2(color) {
@@ -2478,9 +2482,14 @@ document.addEventListener('DOMContentLoaded', () => {
     return null;
   }
 
-  function captureTetherRGB2() {
+  function capturePurpleRGB2() {
     const c = parseColorToRGB2(getComputedStyle(srcEl).color);
-    tetherRGB2 = c || FALLBACK_RGB2.slice();
+    purpleRGB2 = c || FALLBACK_PURPLE_RGB2.slice();
+  }
+
+  function setTileHot2(nextHot) {
+    tileHot2 = !!nextHot;
+    tetherRGB2 = tileHot2 ? purpleRGB2 : WHITE_RGB2;
   }
 
   function buildSourceSeeds2(total) {
@@ -2497,55 +2506,29 @@ document.addEventListener('DOMContentLoaded', () => {
     return out;
   }
 
-  function unionRects2(rects) {
-    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
-    for (let i = 0; i < rects.length; i++) {
-      const r = rects[i];
-      if (!r || r.width === 0 || r.height === 0) continue;
-      if (r.left < minL) minL = r.left;
-      if (r.top < minT) minT = r.top;
-      if (r.right > maxR) maxR = r.right;
-      if (r.bottom > maxB) maxB = r.bottom;
-    }
-    if (!isFinite(minL)) return null;
-    return { left: minL, top: minT, right: maxR, bottom: maxB, width: maxR - minL, height: maxB - minT };
-  }
-
-  function findWorkRect2(el) {
-    const full = (el.textContent || '').toLowerCase();
-    const needle = 'work';
-    const start = full.indexOf(needle);
-    if (start < 0 || !document.createTreeWalker) return el.getBoundingClientRect();
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    const rects = [];
-    let node;
-    let offset = 0;
-    while ((node = walker.nextNode())) {
-      const txt = node.nodeValue || '';
-      const end = offset + txt.length;
-      const s = Math.max(start, offset);
-      const e = Math.min(start + needle.length, end);
-      if (s < e) {
-        const range = document.createRange();
-        range.setStart(node, s - offset);
-        range.setEnd(node, e - offset);
-        const parts = Array.from(range.getClientRects());
-        if (parts.length) rects.push(...parts);
-      }
-      offset = end;
-      if (offset >= start + needle.length) break;
-    }
-    return unionRects2(rects) || el.getBoundingClientRect();
-  }
-
   function remapSourcePoints2() {
     if (!srcSeeds2.length) return;
-    const r = findWorkRect2(srcEl);
+    const r = srcEl.getBoundingClientRect();
     const vp = getVP();
     srcPts2 = srcSeeds2.map((s) => [
       (r.left + r.width * s.nx - vp.ox) * dpr2,
       (r.top  + r.height * s.ny - vp.oy) * dpr2,
     ]);
+  }
+
+  function detachPanelObserver2() {
+    if (!panelRO2) return;
+    panelRO2.disconnect();
+    panelRO2 = null;
+  }
+
+  function attachPanelObserver2(panel) {
+    detachPanelObserver2();
+    if (typeof ResizeObserver === 'undefined') return;
+    panelRO2 = new ResizeObserver(() => {
+      if (activePanel2 === panel) scheduleRecompute2();
+    });
+    panelRO2.observe(panel);
   }
 
   // Side midpoint anchors on outer panel: top / right / bottom / left
@@ -2670,11 +2653,13 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.addEventListener('pointerenter', () => {
       activePanel2 = panel;
       srcEl.classList.add('tether-headline-active');
+      capturePurpleRGB2();
+      setTileHot2(false);
       srcSeeds2 = buildSourceSeeds2(MAIN_N + MICRO_N);
-      captureTetherRGB2();
       remapSourcePoints2();
       const r2 = panel.getBoundingClientRect();
       anchors2 = sideAnchors2(r2);
+      attachPanelObserver2(panel);
       buildFils2(); fadeDir2 = 1; startTime2 = performance.now();
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
       setTimeout(() => {
@@ -2691,9 +2676,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 120);
     }, { passive: true });
 
+    panel.addEventListener('pointermove', (e) => {
+      if (activePanel2 !== panel) return;
+      const isTile = !!e.target.closest('.approach-tile, .approach-tile-video');
+      if (isTile !== tileHot2) setTileHot2(isTile);
+    }, { passive: true });
+
     panel.addEventListener('pointerleave', () => {
       if (activePanel2 === panel) {
         activePanel2 = null;
+        setTileHot2(false);
+        detachPanelObserver2();
         fadeDir2 = -1;
         srcEl.classList.remove('tether-headline-active');
       }
