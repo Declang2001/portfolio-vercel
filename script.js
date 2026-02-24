@@ -1744,39 +1744,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Drift engine ──
   const drift = (() => {
-    const COLORS = [
-      [168, 85, 247],  // accent purple
-      [68, 136, 255],  // blue
-      [68, 221, 255],  // cyan
-      [204, 85, 255]   // soft magenta
-    ];
-    const TRAIL_FADE   = 0.025;
-    const SPEED_MIN    = 0.25;
-    const SPEED_MAX    = 1.2;
-    const LIFE_MIN     = 300;
-    const LIFE_MAX     = 700;
-    const PTR_RADIUS   = 320;
-    const PTR_FORCE    = 0.14;
-    const SEED_COUNT   = 60;
-    const SEED_FLY_MIN = 400;
-    const SEED_FLY_MAX = 700;
+    // ── ION DRIFT v2 ────────────────────────────────────────────────────────
+    const CFG = {
+      COLORS: [[168,85,247],[68,136,255],[68,221,255],[204,85,255]],
+      ION:    [160, 240, 255],  // visible color charge near pointer
+      SPD_MIN: 0.30, SPD_MAX: 1.45,
+      SPD_MIN_R: 0.08, SPD_MAX_R: 0.35,  // reduced motion
+      LIFE_MIN: 280, LIFE_MAX: 950,
+      PTR_R: 340,        // influence radius (canvas px)
+      PTR_F: 0.20,       // vortex force
+      PTR_LERP: 0.10,    // pointer smoothing
+      PTR_RISE: 0.055, PTR_DECAY: 0.030,
+      CURL_T: 0.00025,
+      COMET_DUR: 900, COMET_R: 5, COMET_GLOW: 35, COMET_FRAGS: 9,
+      FRAG_LIFE: 1400, SHOCK_DUR: 560,
+    };
+    const R2 = CFG.PTR_R * CFG.PTR_R;
+    const CSTR = CFG.COLORS.map(c => `rgb(${c[0]},${c[1]},${c[2]})`);
+    const ISTR = `rgb(${CFG.ION[0]},${CFG.ION[1]},${CFG.ION[2]})`;
 
     let ctx, W = 0, H = 0, dpr = 1;
-    let particles = [], seeds = [];
+    let particles = [];
     let raf = 0, intensity = 0;
+    let ptrRawX = -9999, ptrRawY = -9999;
     let ptrX = -9999, ptrY = -9999;
-    let workRect = null;
-    let seedFired = false;
-    let reduced = false, staticDone = false;
-    let ptrVel = 0;
+    let ptrActive = false, ptrIntensity = 0;
     let canvasRect = { left: 0, top: 0, width: 0, height: 0 };
+    let workRect = null, seedFired = false;
+    let reduced = false, staticDone = false, isCoarse = false;
+    let cometActive = false, cometSX = 0, cometSY = 0, cometT0 = 0;
+    let fragments = [], shockwaves = [];
 
     const rnd = (a, b) => Math.random() * (b - a) + a;
 
-    // 4-octave sin/cos pseudo-noise field
     function fieldAngle(x, y, t) {
-      const nx = x / W, ny = y / H;
-      const s = t * 0.0003;
+      const nx = x / W, ny = y / H, s = t * CFG.CURL_T;
       return (
         Math.sin(nx * 2.1 + s * 0.5) + Math.cos(ny * 2.3 + s * 0.3)
         + (Math.sin(nx * 4.7 + s * 0.7) + Math.cos(ny * 4.3 + s * 0.4)) * 0.5
@@ -1785,25 +1787,28 @@ document.addEventListener('DOMContentLoaded', () => {
       ) * Math.PI;
     }
 
-    function spawn(x, y) {
-      const px = x ?? rnd(0, W), py = y ?? rnd(0, H);
-      return {
-        x: px, y: py, lx: px, ly: py,
-        spd: rnd(SPEED_MIN, SPEED_MAX),
-        ci: (Math.random() * COLORS.length) | 0,
-        life: (rnd(LIFE_MIN, LIFE_MAX)) | 0,
-        ml: 0
-      };
+    function makeParticle(x, y) {
+      const px = (x !== undefined) ? x : rnd(0, W);
+      const py = (y !== undefined) ? y : rnd(0, H);
+      const roll = Math.random();
+      let type, r;
+      if (roll < 0.08)      { type = 'shard'; r = rnd(0.5, 0.9); }
+      else if (roll < 0.14) { type = 'hero';  r = rnd(5.0, 9.0); }
+      else                  { type = 'orb';   r = rnd(1.4, 4.5); }
+      const spd = reduced ? rnd(CFG.SPD_MIN_R, CFG.SPD_MAX_R) : rnd(CFG.SPD_MIN, CFG.SPD_MAX);
+      const life = (rnd(CFG.LIFE_MIN, CFG.LIFE_MAX)) | 0;
+      return { x: px, y: py, spd, ci: (Math.random() * 4) | 0,
+               life, ml: life, type, r: r * dpr, ox: 0, oy: 0, bvx: 0, bvy: 0 };
     }
 
     function initPool() {
-      const count = Math.min(Math.max((W * H / 400) | 0, 2000), 8000);
+      const desk = !isCoarse;
+      const dens = reduced ? (desk ? 650 : 1000) : (desk ? 230 : 480);
+      const lo   = reduced ? (desk ? 300 : 150)  : (desk ? 2200 : 600);
+      const hi   = reduced ? (desk ? 700 : 350)  : (desk ? 5500 : 2000);
+      const n = Math.min(Math.max((W * H / dens) | 0, lo), hi);
       particles = [];
-      for (let i = 0; i < count; i++) {
-        const p = spawn();
-        p.ml = p.life;
-        particles.push(p);
-      }
+      for (let i = 0; i < n; i++) particles.push(makeParticle());
     }
 
     function updateCanvasRect() {
@@ -1812,148 +1817,231 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function doResize() {
-      const layoutW = driftCanvas.offsetWidth;
-      const layoutH = driftCanvas.offsetHeight;
-      if (layoutW === 0 || layoutH === 0) return;
+      const lW = driftCanvas.offsetWidth, lH = driftCanvas.offsetHeight;
+      if (!lW || !lH) return;
       dpr = _wcsViewport.getDprCap();
-      W = (layoutW * dpr) | 0;
-      H = (layoutH * dpr) | 0;
-      driftCanvas.width = W;
-      driftCanvas.height = H;
-      initPool();
-      seeds = [];
+      W = (lW * dpr) | 0; H = (lH * dpr) | 0;
+      driftCanvas.width = W; driftCanvas.height = H;
+      initPool(); fragments = []; shockwaves = [];
       if (workAccent) workRect = workAccent.getBoundingClientRect();
       updateCanvasRect();
-      if (reduced && !staticDone) renderStaticFrame();
+      if (reduced && !staticDone) renderStatic();
     }
 
-    function renderStaticFrame() {
-      if (!ctx || W === 0) return;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, W, H);
-      for (let f = 0; f < 60; f++) updateParticles(f * 16);
-      renderFrame();
-      staticDone = true;
+    function tickPointer() {
+      if (ptrRawX < -999) return;
+      ptrX += (ptrRawX - ptrX) * CFG.PTR_LERP;
+      ptrY += (ptrRawY - ptrY) * CFG.PTR_LERP;
+      ptrIntensity = ptrActive
+        ? Math.min(ptrIntensity + CFG.PTR_RISE, 1)
+        : Math.max(ptrIntensity - CFG.PTR_DECAY, 0);
     }
 
-    function updateParticles(time) {
+    function updateParticles(t) {
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
-        p.lx = p.x; p.ly = p.y;
+        const a = fieldAngle(p.x, p.y, t);
+        let vx = Math.cos(a) * p.spd + p.bvx;
+        let vy = Math.sin(a) * p.spd + p.bvy;
+        p.bvx *= 0.91; p.bvy *= 0.91;
 
-        const a = fieldAngle(p.x, p.y, time);
-        let vx = Math.cos(a) * p.spd;
-        let vy = Math.sin(a) * p.spd;
+        if (ptrIntensity > 0.01) {
+          const dx = p.x - ptrX, dy = p.y - ptrY;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < R2 && d2 > 0.1) {
+            const d = Math.sqrt(d2);
+            const f = (1 - d / CFG.PTR_R) * CFG.PTR_F * ptrIntensity;
+            const pa = Math.atan2(dy, dx) + 1.5708;
+            vx += Math.cos(pa) * f * (p.spd + 1) * 0.75;
+            vy += Math.sin(pa) * f * (p.spd + 1) * 0.75;
+            vx += (-dx / d) * f * (p.spd + 1) * 0.40;
+            vy += (-dy / d) * f * (p.spd + 1) * 0.40;
+            const prox = (1 - d / CFG.PTR_R) * ptrIntensity;
+            p.ox += ((-dx / d) * prox * 2.5 - p.ox) * 0.12;
+            p.oy += ((-dy / d) * prox * 2.5 - p.oy) * 0.12;
+          } else { p.ox *= 0.93; p.oy *= 0.93; }
+        } else { p.ox *= 0.97; p.oy *= 0.97; }
 
-        // Pointer interaction: swirl + direct attraction (velocity-scaled)
-        const dx = p.x - ptrX, dy = p.y - ptrY;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < PTR_RADIUS * PTR_RADIUS && d2 > 1) {
-          const d = Math.sqrt(d2);
-          const f = (1 - d / PTR_RADIUS) * PTR_FORCE;
-          const velScale = 1 + ptrVel * 0.05;
-          // Tangential swirl (perpendicular)
-          const pa = Math.atan2(dy, dx) + 1.5708;
-          vx += Math.cos(pa) * f * (p.spd + 1) * velScale * 0.6;
-          vy += Math.sin(pa) * f * (p.spd + 1) * velScale * 0.6;
-          // Direct attraction (toward cursor)
-          const ax = -dx / d, ay = -dy / d;
-          vx += ax * f * (p.spd + 1) * velScale * 0.5;
-          vy += ay * f * (p.spd + 1) * velScale * 0.5;
-        }
-
-        p.x += vx; p.y += vy;
-        p.life--;
-
-        if (p.life <= 0 || p.x < 0 || p.x > W || p.y < 0 || p.y > H) {
-          const n = spawn();
-          p.x = n.x; p.y = n.y; p.lx = n.lx; p.ly = n.ly;
-          p.spd = n.spd; p.ci = n.ci; p.life = n.life; p.ml = n.life;
+        const sp2 = vx * vx + vy * vy;
+        if (sp2 > 16) { const inv = 4 / Math.sqrt(sp2); vx *= inv; vy *= inv; }
+        p.x += vx; p.y += vy; p.life--;
+        if (p.life <= 0 || p.x < -10 || p.x > W + 10 || p.y < -10 || p.y > H + 10) {
+          Object.assign(p, makeParticle());
         }
       }
     }
 
-    function updateSeeds(now) {
-      for (let i = seeds.length - 1; i >= 0; i--) {
-        const s = seeds[i];
-        const t = Math.min((now - s.st) / s.dur, 1);
-        const e = 1 - (1 - t) * (1 - t) * (1 - t); // easeOutCubic
-        s.lx = s.x; s.ly = s.y;
-        s.x += (s.tx - s.x) * e * 0.08;
-        s.y += (s.ty - s.y) * e * 0.08;
-        if (t >= 1) {
-          const p = spawn(s.x, s.y);
-          p.ci = s.ci; p.ml = p.life;
-          particles.push(p);
-          seeds.splice(i, 1);
-        }
-      }
-    }
-
-    function renderFrame() {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = intensity || 1;
-
+    function renderParticles() {
+      const ic = CFG.ION, eff = intensity || 1;
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
-        const c = COLORS[p.ci];
         const fade = p.ml > 0 ? p.life / p.ml : 0;
-        ctx.lineWidth = 1.2 + (p.spd / SPEED_MAX) * 1.3;
-        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${(fade * 0.8).toFixed(2)})`;
-        ctx.beginPath();
-        ctx.moveTo(p.lx, p.ly);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-      }
+        const base = fade * eff;
+        if (base < 0.01) continue;
 
-      for (let i = 0; i < seeds.length; i++) {
-        const s = seeds[i];
-        const c = COLORS[s.ci];
-        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},0.9)`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(s.lx, s.ly);
-        ctx.lineTo(s.x, s.y);
-        ctx.stroke();
-      }
+        let rc = CFG.COLORS[p.ci][0], gc = CFG.COLORS[p.ci][1], bc = CFG.COLORS[p.ci][2];
+        let scale3d = 1, bright = 1, useIstr = false;
 
+        if (ptrIntensity > 0.02) {
+          const dx = p.x - ptrX, dy = p.y - ptrY;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < R2) {
+            const prox = (1 - Math.sqrt(d2) / CFG.PTR_R) * ptrIntensity;
+            rc = (rc + (ic[0] - rc) * prox) | 0;
+            gc = (gc + (ic[1] - gc) * prox) | 0;
+            bc = (bc + (ic[2] - bc) * prox) | 0;
+            scale3d = 1 + prox * 0.85; bright = 1 + prox * 1.30;
+            useIstr = false;
+          }
+        }
+
+        const dx2 = p.x + p.ox, dy2 = p.y + p.oy, dr = p.r * scale3d;
+        ctx.fillStyle = useIstr ? ISTR : `rgb(${rc},${gc},${bc})`;
+
+        if (p.type === 'shard') {
+          ctx.globalAlpha = Math.min(base * bright, 1);
+          ctx.beginPath(); ctx.arc(dx2, dy2, dr + 0.5, 0, 6.283); ctx.fill();
+        } else {
+          ctx.globalAlpha = Math.min(base * 0.17 * bright, 1);
+          ctx.beginPath(); ctx.arc(dx2, dy2, dr * 2.8, 0, 6.283); ctx.fill();
+          ctx.globalAlpha = Math.min(base * 0.78 * bright, 1);
+          ctx.beginPath(); ctx.arc(dx2, dy2, dr, 0, 6.283); ctx.fill();
+        }
+      }
+    }
+
+    function spawnShockwave(x, y, c) {
+      shockwaves.push({ x, y, maxR: 90 * dpr, st: performance.now(),
+                        dur: CFG.SHOCK_DUR, str: `rgb(${c[0]},${c[1]},${c[2]})` });
+    }
+
+    function drawShockwaves(now) {
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const s = shockwaves[i];
+        const t = Math.min((now - s.st) / s.dur, 1);
+        if (t >= 1) { shockwaves.splice(i, 1); continue; }
+        ctx.globalAlpha = (1 - t) * 0.65 * (intensity || 1);
+        ctx.strokeStyle = s.str;
+        ctx.lineWidth = 2 * dpr * (1 - t * 0.6);
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.maxR * t, 0, 6.283); ctx.stroke();
+      }
+    }
+
+    function drawComet(now) {
+      if (!cometActive) return;
+      const t = Math.min((now - cometT0) / CFG.COMET_DUR, 1);
+      const e = 1 - (1 - t) * (1 - t) * (1 - t);
+      const cx = cometSX + (W / 2 - cometSX) * e;
+      const cy = cometSY + (H / 2 - cometSY) * e;
+      ctx.save();
+      ctx.shadowColor = ISTR; ctx.shadowBlur = CFG.COMET_GLOW * dpr;
+      ctx.globalAlpha = 0.42 * (intensity || 1);
+      ctx.fillStyle = ISTR;
+      ctx.beginPath(); ctx.arc(cx, cy, CFG.COMET_R * 2.8 * dpr, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 0.95 * (intensity || 1);
+      ctx.fillStyle = '#fff'; ctx.shadowBlur = CFG.COMET_GLOW * 0.5 * dpr;
+      ctx.beginPath(); ctx.arc(cx, cy, CFG.COMET_R * dpr, 0, 6.283); ctx.fill();
       ctx.restore();
+      if (t >= 1) {
+        cometActive = false;
+        spawnShockwave(cx, cy, CFG.ION); spawnShockwave(cx, cy, CFG.COLORS[2]);
+        for (let i = 0; i < CFG.COMET_FRAGS; i++) {
+          const a = rnd(0, Math.PI * 2), sp = rnd(3.5, 8.5);
+          fragments.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                           r: rnd(2, 5) * dpr, ci: (Math.random() * 4) | 0,
+                           st: now, life: rnd(CFG.FRAG_LIFE * 0.55, CFG.FRAG_LIFE) });
+        }
+      }
+    }
+
+    function drawFragments(now) {
+      for (let i = fragments.length - 1; i >= 0; i--) {
+        const f = fragments[i];
+        const age = now - f.st;
+        if (age > f.life) {
+          const p = makeParticle(f.x, f.y); particles.push(p);
+          fragments.splice(i, 1); continue;
+        }
+        f.vx *= 0.97; f.vy *= 0.97; f.x += f.vx; f.y += f.vy;
+        const mt = age / f.life;
+        const c = CFG.COLORS[f.ci];
+        ctx.save();
+        ctx.globalAlpha = (1 - mt) * 0.9 * (intensity || 1);
+        ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+        ctx.shadowColor = `rgb(${c[0]},${c[1]},${c[2]})`;
+        ctx.shadowBlur = f.r * 4 * (1 - mt * 0.7);
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.5 + (1 - mt) * 0.7), 0, 6.283); ctx.fill();
+        ctx.restore();
+      }
     }
 
     function loop() {
       const now = performance.now();
-      ctx.fillStyle = `rgba(0,0,0,${TRAIL_FADE})`;
-      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, W, H);
+      tickPointer();
       updateParticles(now);
-      updateSeeds(now);
-      renderFrame();
+      ctx.globalCompositeOperation = 'lighter';
+      renderParticles();
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      drawShockwaves(now);
+      if (cometActive) drawComet(now);
+      if (fragments.length) drawFragments(now);
+      ctx.globalAlpha = 1;
       raf = requestAnimationFrame(loop);
     }
 
     function start() { if (!raf && !reduced) raf = requestAnimationFrame(loop); }
     function stop()  { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
 
+    function renderStatic() {
+      if (!ctx || !W) return;
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, W, H);
+      for (let f = 0; f < 60; f++) updateParticles(f * 16);
+      ctx.globalCompositeOperation = 'lighter'; renderParticles();
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      staticDone = true;
+    }
+
     function onPtr(ev) {
       const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
       const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
-      if (canvasRect.width <= 0 || canvasRect.height <= 0) return;
-      const nx = ((cx - canvasRect.left) / canvasRect.width) * W;
-      const ny = ((cy - canvasRect.top) / canvasRect.height) * H;
-      const ddx = nx - ptrX, ddy = ny - ptrY;
-      ptrVel = Math.min(Math.sqrt(ddx * ddx + ddy * ddy), 40);
-      ptrX = nx;
-      ptrY = ny;
+      if (!canvasRect.width) return;
+      ptrRawX = ((cx - canvasRect.left) / canvasRect.width) * W;
+      ptrRawY = ((cy - canvasRect.top) / canvasRect.height) * H;
+      if (ptrX < -999) { ptrX = ptrRawX; ptrY = ptrRawY; }
     }
 
     return {
       init() {
         ctx = driftCanvas.getContext('2d');
         reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        isCoarse = window.matchMedia('(pointer: coarse)').matches;
         doResize();
         if (!reduced) {
           window.addEventListener('mousemove', onPtr, { passive: true });
           window.addEventListener('touchmove', onPtr, { passive: true });
+          videoWrapper.addEventListener('mouseenter', () => { ptrActive = true; }, { passive: true });
+          videoWrapper.addEventListener('mouseleave', () => { ptrActive = false; }, { passive: true });
+          driftCanvas.addEventListener('click', (ev) => {
+            if (!W) return;
+            const cx = ((ev.clientX - canvasRect.left) / canvasRect.width) * W;
+            const cy = ((ev.clientY - canvasRect.top) / canvasRect.height) * H;
+            spawnShockwave(cx, cy, CFG.COLORS[2]);
+            for (let i = 0; i < 16; i++) {
+              const p = makeParticle(cx, cy);
+              const a = (i / 16) * Math.PI * 2;
+              p.bvx = Math.cos(a) * rnd(2, 5); p.bvy = Math.sin(a) * rnd(2, 5);
+              particles.push(p);
+            }
+          });
+          new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+              if (e.isIntersecting && intensity > 0) start();
+              else if (!e.isIntersecting) stop();
+            });
+          }, { threshold: 0.01 }).observe(videoWrapper);
         }
       },
 
@@ -1966,25 +2054,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reduced) return;
         if (progress >= 0.35 && !seedFired) {
           if (!workRect) return;
-          const cr = driftCanvas.getBoundingClientRect();
-          const cx = ((workRect.left + workRect.width / 2) - cr.left) * dpr;
-          const cy = ((workRect.top + workRect.height / 2) - cr.top) * dpr;
-          const tx = W / 2, ty = H / 2;
-          seeds = [];
-          for (let i = 0; i < SEED_COUNT; i++) {
-            const a = rnd(0, Math.PI * 2), d = rnd(5, 25);
-            seeds.push({
-              x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d,
-              lx: cx, ly: cy, tx, ty,
-              st: performance.now(), dur: rnd(SEED_FLY_MIN, SEED_FLY_MAX),
-              ci: (Math.random() * COLORS.length) | 0
-            });
-          }
+          const sx = ((workRect.left + workRect.width / 2) - canvasRect.left) * dpr;
+          const sy = ((workRect.top + workRect.height / 2) - canvasRect.top) * dpr;
+          cometSX = sx; cometSY = sy;
+          cometActive = true; cometT0 = performance.now();
           seedFired = true;
         }
         if (progress < 0.2 && seedFired) {
-          seedFired = false;
-          seeds = [];
+          seedFired = false; cometActive = false; fragments = [];
         }
       },
 
