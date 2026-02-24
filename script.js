@@ -2451,8 +2451,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
   let startTime2 = 0, activePanel2 = null;
   let srcPts2 = [], srcSeeds2 = [], anchors2 = [], fils2 = [], bursts2 = [];
-  let purpleRGB2 = FALLBACK_PURPLE_RGB2.slice();
-  let tetherRGB2 = FALLBACK_PURPLE_RGB2.slice();
+  // Read --accent from :root once; never sample headline text (which is white by default)
+  const _accentRaw = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const purpleRGB2 = parseColorToRGB2(_accentRaw) || FALLBACK_PURPLE_RGB2.slice();
+  const tetherRGB2 = purpleRGB2; // constant reference — color never changes
   let panelRO2 = null;
   const rnd2 = (a, b) => Math.random() * (b - a) + a;
 
@@ -2478,11 +2480,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
     }
     return null;
-  }
-
-  function capturePurpleRGB2() {
-    const c = parseColorToRGB2(getComputedStyle(srcEl).color);
-    purpleRGB2 = c || FALLBACK_PURPLE_RGB2.slice();
   }
 
   function buildSourceSeeds2(total) {
@@ -2646,8 +2643,6 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.addEventListener('pointerenter', () => {
       activePanel2 = panel;
       srcEl.classList.add('tether-headline-active');
-      capturePurpleRGB2();
-      tetherRGB2 = purpleRGB2;
       srcSeeds2 = buildSourceSeeds2(MAIN_N + MICRO_N);
       remapSourcePoints2();
       const r2 = panel.getBoundingClientRect();
