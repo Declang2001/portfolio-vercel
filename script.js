@@ -2870,7 +2870,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Tile id -> ordered list of clip URLs
   const rotationMap = {
-    'tile-3d': ['https://res.cloudinary.com/ddpcw88mj/video/upload/lab7.mp4'],
+    'tile-3d': ['https://res.cloudinary.com/ddpcw88mj/video/upload/style2.mp4'],
     'tile-final': ['https://res.cloudinary.com/ddpcw88mj/video/upload/s3.mp4'],
     'tile-edit': ['https://res.cloudinary.com/ddpcw88mj/video/upload/vid2.mp4'],
     'tile-brand': ['https://res.cloudinary.com/ddpcw88mj/video/upload/vid3.mp4', 'https://res.cloudinary.com/ddpcw88mj/video/upload/vid2.mp4'],
