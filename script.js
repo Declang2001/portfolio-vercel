@@ -28,22 +28,36 @@ const _wcsViewport = (() => {
 })();
 
 // ── Dev mode: skip Cloudinary video loading on localhost / ?novideo ──
-const _vmDevMode = (
-  location.hostname === 'localhost' ||
-  location.hostname === '127.0.0.1' ||
-  new URLSearchParams(location.search).has('novideo')
-);
+// Override with ?video=1 to force real video locally (e.g. to test loading UX).
+const _vmDevMode = (() => {
+  const p = new URLSearchParams(location.search);
+  if (p.has('video')) return false;
+  return (
+    location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1' ||
+    p.has('novideo')
+  );
+})();
 
 // ── Cloudinary URL optimizer: inject f_auto,q_auto,vc_auto + width cap ──
+// Tile widths are intentionally smaller than modal/full-screen playback.
 const _cldOpt = (() => {
   const coarse = window.matchMedia('(pointer: coarse)').matches;
-  const t = coarse ? 'f_auto,q_auto,vc_auto,w_720,c_limit' : 'f_auto,q_auto,vc_auto,w_960,c_limit';
+  const t = coarse ? 'f_auto,q_auto,vc_auto,w_540,c_limit' : 'f_auto,q_auto,vc_auto,w_720,c_limit';
   return function (url) {
     if (!url || !url.includes('/video/upload/')) return url;
     if (url.includes(t)) return url;
     return url.replace('/video/upload/', '/video/upload/' + t + '/');
   };
 })();
+
+// ── Cloudinary poster: first frame as a small JPEG ──
+const _cldPoster = (url) => {
+  if (!url || !url.includes('/video/upload/')) return '';
+  return url
+    .replace('/video/upload/', '/video/upload/so_0,f_jpg,q_auto,w_800,c_limit/')
+    .replace(/\.(mp4|mov|webm)(\?.*)?$/i, '.jpg');
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   // 1. Dynamic year in footer
@@ -2130,13 +2144,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-// Approach collage: auto cycle and fade between videos — lazy, visibility-gated
+// Approach collage: posters + staged lazy playback
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.body.classList.contains('approach-page')) return;
 
   const _prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const _canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  // Tile id -> list of files to cycle through in order
+  // Tile id -> ordered list of clip URLs
   const rotationMap = {
     'tile-3d': ['https://res.cloudinary.com/ddpcw88mj/video/upload/lab7.mp4'],
     'tile-final': ['https://res.cloudinary.com/ddpcw88mj/video/upload/s3.mp4'],
@@ -2147,44 +2162,66 @@ document.addEventListener('DOMContentLoaded', () => {
     'tile-delivery': ['https://res.cloudinary.com/ddpcw88mj/video/upload/d3.mp4']
   };
 
-  const rotationIds = new Set(Object.keys(rotationMap));
+  const sbPlaylist = ['https://res.cloudinary.com/ddpcw88mj/video/upload/lab8.mp4'];
+  const allTileVideos = Array.from(document.querySelectorAll('.approach-tile-video video'));
 
-  // ── Rotation map tiles: load + play only when near view ──
+  // First/primary source URL for any tile video (used for poster + preload)
+  function tileFirstSrc(v) {
+    if (v.id === 'storyboardPlaylistVideo') return sbPlaylist[0];
+    const article = v.closest('article[id]');
+    if (article && rotationMap[article.id]) return rotationMap[article.id][0];
+    return v.dataset.src || '';
+  }
+
+  // ── A) Posters — runs always, including dev mode and reduced-motion ──
+  allTileVideos.forEach((v) => {
+    if (!v.poster) {
+      const src = tileFirstSrc(v);
+      if (src) v.poster = _cldPoster(src);
+    }
+  });
+
+  // No video playback in dev mode (posters remain visible) or reduced-motion
+  if (_vmDevMode || _prefersReduced) return;
+
+  // ── Shared active-video tracker (one playing at a time across all tiles) ──
+  let vmActive = null;
+  function vmPauseVideo(v) { if (v && !v.paused) v.pause(); }
+  function vmPlay(v) {
+    if (vmActive && vmActive !== v) vmPauseVideo(vmActive);
+    vmActive = v;
+    v.muted = true;
+    const p = v.play();
+    if (p && p.catch) p.catch(() => {});
+  }
+
+  // On-demand src assignment (fallback if preload observer hasn't fired yet)
+  function ensureSrc(v) {
+    if (v.getAttribute('src')) return;
+    const src = tileFirstSrc(v);
+    if (!src) return;
+    v.src = _cldOpt(src);
+    v.preload = 'metadata';
+    v.load();
+  }
+
+  // ── Rotation map: crossfade + loop setup ──
+  const rotIdx = {}; // tileId -> current clip index
   Object.entries(rotationMap).forEach(([tileId, sources]) => {
     const tile = document.getElementById(tileId);
-    if (!tile || !sources.length) return;
+    if (!tile) return;
     const video = tile.querySelector('video');
-    if (!video || _vmDevMode || _prefersReduced) return;
-
-    const hasMultiple = sources.length > 1;
-    let index = 0;
+    if (!video) return;
 
     video.style.width = '100%';
     video.style.height = '100%';
     video.style.objectFit = 'cover';
     video.style.display = 'block';
+    rotIdx[tileId] = 0;
 
-    function playCurrent() {
-      video.src = _cldOpt(sources[index]);
-      video.load();
-      const playPromise = video.play();
-      if (playPromise && playPromise.catch) playPromise.catch(() => {});
-    }
+    if (sources.length <= 1) { video.loop = true; return; }
 
-    if (!hasMultiple) {
-      video.loop = true;
-      new IntersectionObserver((entries, obs) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting && !video.getAttribute('src')) {
-            playCurrent();
-            obs.unobserve(video);
-          }
-        });
-      }, { rootMargin: '0px 200px 0px 200px', threshold: 0.1 }).observe(video);
-      return;
-    }
-
-    // Multi clip tile with crossfade
+    // Multi-clip crossfade
     video.loop = false;
     video.style.opacity = '1';
     video.style.transition = 'opacity 420ms ease';
@@ -2194,98 +2231,92 @@ document.addEventListener('DOMContentLoaded', () => {
       video.dataset.fading = 'out';
       video.style.opacity = '0';
     }
-
-    video.addEventListener('transitionend', (event) => {
-      if (event.propertyName !== 'opacity') return;
+    video.addEventListener('transitionend', (ev) => {
+      if (ev.propertyName !== 'opacity') return;
       if (video.dataset.fading === 'out') {
-        index = (index + 1) % sources.length;
+        rotIdx[tileId] = (rotIdx[tileId] + 1) % sources.length;
         video.dataset.fading = 'in';
-        video.src = _cldOpt(sources[index]);
+        video.src = _cldOpt(sources[rotIdx[tileId]]);
         video.load();
-        const promise = video.play();
-        if (promise && promise.catch) promise.catch(() => {});
+        vmPlay(video);
         requestAnimationFrame(() => { video.style.opacity = '1'; });
       } else if (video.dataset.fading === 'in') {
         video.dataset.fading = '';
       }
     });
-
     video.addEventListener('ended', fadeToNext);
     tile.addEventListener('click', fadeToNext);
-
-    new IntersectionObserver((entries, obs) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting && !video.getAttribute('src')) {
-          playCurrent();
-          obs.unobserve(video);
-        }
-      });
-    }, { rootMargin: '0px 200px 0px 200px', threshold: 0.1 }).observe(video);
   });
 
-  // ── Video Manager: simple approach tile videos (non-rotation, non-storyboard) ──
-  if (!_vmDevMode && !_prefersReduced) {
-    let vmActive = null;
-
-    const vmVideos = Array.from(document.querySelectorAll('.approach-tile-video video')).filter((v) => {
-      if (v.id === 'storyboardPlaylistVideo') return false;
-      const article = v.closest('article[id]');
-      return !article || !rotationIds.has(article.id);
-    });
-
-    if (vmVideos.length) {
-      const vmObs = new IntersectionObserver((entries) => {
-        entries.forEach((e) => {
-          if (!e.isIntersecting && !e.target.paused) e.target.pause();
-        });
-        const best = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (best) {
-          const v = best.target;
-          if (vmActive && vmActive !== v && !vmActive.paused) vmActive.pause();
-          vmActive = v;
-          if (!v.getAttribute('src') && v.dataset.src) {
-            v.src = _cldOpt(v.dataset.src);
-            v.load();
-          }
-          v.muted = true;
-          const p = v.play();
-          if (p && p.catch) p.catch(() => {});
-        }
-      }, { rootMargin: '0px 200px 0px 200px', threshold: [0.1, 0.35, 0.6] });
-      vmVideos.forEach((v) => vmObs.observe(v));
-    }
-  }
-
-  // ── Storyboard playlist (visibility-gated) ──
+  // Storyboard playlist cycling (re-plays on ended)
   const sbVideo = document.getElementById('storyboardPlaylistVideo');
-  if (sbVideo && !_vmDevMode && !_prefersReduced) {
-    const sbPlaylist = ['https://res.cloudinary.com/ddpcw88mj/video/upload/lab8.mp4'];
-    let sbIndex = 0;
-
-    function sbPlayCurrent() {
-      sbVideo.src = _cldOpt(sbPlaylist[sbIndex]);
-      sbVideo.load();
-      sbVideo.muted = true;
-      const p = sbVideo.play();
-      if (p && p.catch) p.catch(() => {});
-    }
-
+  let sbIndex = 0;
+  if (sbVideo) {
     sbVideo.addEventListener('ended', () => {
       sbIndex = (sbIndex + 1) % sbPlaylist.length;
-      sbPlayCurrent();
+      if (vmActive === sbVideo) {
+        sbVideo.src = _cldOpt(sbPlaylist[sbIndex]);
+        sbVideo.load();
+        vmPlay(sbVideo);
+      }
     });
-
-    new IntersectionObserver((entries, obs) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting && !sbVideo.getAttribute('src')) {
-          sbPlayCurrent();
-          obs.unobserve(sbVideo);
-        }
-      });
-    }, { rootMargin: '0px 200px 0px 200px', threshold: 0.1 }).observe(sbVideo);
   }
+
+  // ── B) Stage 1: preload zone — assign src + preload=metadata before play ──
+  const preloadObs = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      const v = e.target;
+      if (v.getAttribute('src')) { preloadObs.unobserve(v); return; }
+      const src = tileFirstSrc(v);
+      if (!src) return;
+      v.src = _cldOpt(src);
+      v.preload = 'metadata';
+      v.load();
+      preloadObs.unobserve(v);
+    });
+  }, { rootMargin: '200px 400px 200px 400px', threshold: 0 });
+  allTileVideos.forEach((v) => preloadObs.observe(v));
+
+  // ── C) Desktop: hover-to-play (pointer: fine + hover) ──
+  if (_canHover) {
+    allTileVideos.forEach((v) => {
+      const article = v.closest('article');
+      if (!article) return;
+      article.addEventListener('pointerenter', () => { ensureSrc(v); vmPlay(v); });
+      article.addEventListener('pointerleave', () => vmPauseVideo(v));
+    });
+    return; // desktop done — no scroll-driven autoplay
+  }
+
+  // ── D) Mobile: autoplay best visible video after first user gesture ──
+  const intersecting = new Map(); // video -> intersectionRatio
+  let gestureReady = false;
+
+  const playZoneObs = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        intersecting.set(e.target, e.intersectionRatio);
+      } else {
+        intersecting.delete(e.target);
+        vmPauseVideo(e.target);
+      }
+    });
+    if (!gestureReady) return;
+    let bestV = null, bestR = 0;
+    intersecting.forEach((r, v) => { if (r > bestR) { bestR = r; bestV = v; } });
+    if (bestV) vmPlay(bestV);
+  }, { rootMargin: '0px', threshold: [0.1, 0.35, 0.6] });
+  allTileVideos.forEach((v) => playZoneObs.observe(v));
+
+  function onFirstGesture() {
+    gestureReady = true;
+    let bestV = null, bestR = 0;
+    intersecting.forEach((r, v) => { if (r > bestR) { bestR = r; bestV = v; } });
+    if (bestV) vmPlay(bestV);
+  }
+  document.addEventListener('touchstart', onFirstGesture, { once: true, passive: true });
+  document.addEventListener('scroll', onFirstGesture, { once: true, passive: true });
 });
 
 
