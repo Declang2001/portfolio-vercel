@@ -3080,7 +3080,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const highlightsEl = document.getElementById('journeyHighlights');
   const skipBtn   = document.getElementById('jSkip');
   const resumeBtn = document.getElementById('jResume');
-  const replayBtn = document.getElementById('jReplay');
+  const workBtn   = document.getElementById('jWork');
   if (!cvs) return;
 
   const ctx = cvs.getContext('2d');
@@ -3197,7 +3197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scrollTo(0, Math.max(0, scrollTarget));
     if (resumeBtn) resumeBtn.textContent = 'tunnel run';
     if (skipBtn)   skipBtn.hidden = true;
-    if (replayBtn && !reduced) replayBtn.hidden = false;
+    if (workBtn) workBtn.hidden = false;
   }
   function showTunnelMode() {
     isTunnelMode = true;
@@ -3206,7 +3206,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideCard(); done = false;
     if (resumeBtn) resumeBtn.textContent = 'resume mode';
     if (skipBtn)   skipBtn.hidden = false;
-    if (replayBtn) replayBtn.hidden = true;
+    if (workBtn) workBtn.hidden = true;
     initTunnel(); startAnim();
   }
   function endAnimation() { done = true; showResumeMode(); }
@@ -3444,7 +3444,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (resumeBtn) resumeBtn.addEventListener('click', function() {
     if (isTunnelMode) showResumeMode(); else showTunnelMode();
   });
-  if (replayBtn) replayBtn.addEventListener('click', showTunnelMode);
+  // workBtn is a plain <a href> — no JS listener needed
 
   document.addEventListener('click', function() {
     if (!isTunnelMode || done) return;
