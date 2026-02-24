@@ -32,7 +32,7 @@
     }
     .journey-ctrl-btn {
       border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 2px;
+      border-radius: 999px;
       background: rgba(10,10,15,0.75);
       color: rgba(255,255,255,0.65);
       font-size: 0.72rem;
@@ -51,80 +51,13 @@
       outline: none;
     }
 
-    /* Portal overlay */
-    .journey-portal-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    /* Portal nodes */
-    .journey-portal {
-      position: absolute;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 2px solid rgba(168,85,247,0.45);
-      background: radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%);
-      cursor: pointer;
-      pointer-events: auto;
-      transform: translate(-50%, -50%);
-      transition: border-color 0.25s ease, transform 0.25s ease, background 0.25s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .journey-portal::after {
-      content: '';
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: rgba(168,85,247,0.7);
-      display: block;
-    }
-    .journey-portal:hover,
-    .journey-portal:focus-visible {
-      border-color: rgba(168,85,247,0.9);
-      transform: translate(-50%, -50%) scale(1.18);
-      background: radial-gradient(circle, rgba(168,85,247,0.22) 0%, transparent 70%);
-      outline: none;
-    }
-    .journey-portal.is-active {
-      border-color: rgba(168,85,247,0.9);
-      animation: portal-pulse 1.4s ease infinite;
-    }
-    .journey-portal.is-visited {
-      border-color: rgba(168,85,247,0.25);
-      background: radial-gradient(circle, rgba(168,85,247,0.05) 0%, transparent 70%);
-    }
-    .journey-portal.is-visited::after {
-      background: rgba(168,85,247,0.3);
-    }
-    .journey-portal-label {
-      position: absolute;
-      top: calc(100% + 0.45rem);
-      left: 50%;
-      transform: translateX(-50%);
-      white-space: nowrap;
-      font-size: 0.62rem;
-      letter-spacing: 0.1em;
-      color: rgba(255,255,255,0.4);
-      pointer-events: none;
-    }
-
-    @keyframes portal-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(168,85,247,0.35); }
-      50%       { box-shadow: 0 0 0 8px rgba(168,85,247,0); }
-    }
-
     /* Info card */
     .journey-card {
       position: fixed;
       z-index: 20;
       background: rgba(8,8,14,0.94);
       border: 1px solid rgba(168,85,247,0.3);
-      border-radius: 8px;
+      border-radius: 18px;
       padding: 1.1rem 1.4rem;
       width: 270px;
       pointer-events: auto;
@@ -168,7 +101,7 @@
       letter-spacing: 0.09em;
       padding: 0.18rem 0.45rem;
       border: 1px solid rgba(168,85,247,0.38);
-      border-radius: 2px;
+      border-radius: 999px;
       color: rgba(168,85,247,0.8);
     }
 
@@ -176,9 +109,9 @@
     .journey-resume {
       position: relative;
       z-index: 10;
-      max-width: 680px;
+      max-width: 740px;
       margin: 0 auto;
-      padding: calc(var(--header-height, 64px) + 4rem) 2rem 3rem;
+      padding: calc(var(--header-height, 64px) + 5rem) 2rem 4rem;
     }
     .journey-section-label {
       font-size: 0.7rem;
@@ -217,7 +150,7 @@
       margin-bottom: 0.25rem;
     }
     .journey-timeline-title {
-      font-size: 1.05rem;
+      font-size: 1.18rem;
       font-weight: 700;
       color: #fff;
       margin-bottom: 0.3rem;
@@ -239,7 +172,7 @@
       letter-spacing: 0.08em;
       padding: 0.15rem 0.42rem;
       border: 1px solid rgba(168,85,247,0.32);
-      border-radius: 2px;
+      border-radius: 999px;
       color: rgba(168,85,247,0.72);
     }
 
@@ -247,7 +180,7 @@
     .journey-highlights {
       position: relative;
       z-index: 10;
-      max-width: 680px;
+      max-width: 740px;
       margin: 0 auto;
       padding: 1rem 2rem 5rem;
       border-top: 1px solid rgba(255,255,255,0.07);
@@ -296,14 +229,14 @@
       letter-spacing: 0.09em;
       padding: 0.28rem 0.75rem;
       border: 1px solid rgba(255,255,255,0.13);
-      border-radius: 2px;
+      border-radius: 999px;
       color: rgba(255,255,255,0.55);
     }
     .journey-cta-btn {
       display: inline-block;
       padding: 0.62rem 2rem;
       border: 1px solid rgba(168,85,247,0.55);
-      border-radius: 2px;
+      border-radius: 999px;
       color: rgba(168,85,247,0.9);
       font-size: 0.78rem;
       letter-spacing: 0.15em;
@@ -328,10 +261,8 @@
 
     @media (prefers-reduced-motion: reduce) {
       .journey-card,
-      .journey-portal,
       .journey-cta-btn,
       .journey-ctrl-btn { transition: none; }
-      .journey-portal.is-active { animation: none; }
     }
   </style>
 </head>
@@ -351,17 +282,11 @@
   <!-- Space / star canvas — fixed, always behind content -->
   <canvas id="journeyCanvas" aria-hidden="true"></canvas>
 
-  <!-- Controls (always visible during portal mode) -->
+  <!-- Controls (always visible during tunnel mode) -->
   <div class="journey-controls" id="journeyControls" role="toolbar" aria-label="Journey controls">
     <button class="journey-ctrl-btn" id="jSkip">skip</button>
-    <button class="journey-ctrl-btn" id="jJump">highlights</button>
     <button class="journey-ctrl-btn" id="jResume">resume mode</button>
     <button class="journey-ctrl-btn" id="jReplay" hidden>replay</button>
-  </div>
-
-  <!-- Portal nodes overlay -->
-  <div class="journey-portal-overlay" id="journeyPortalOverlay" hidden aria-hidden="true">
-    <!-- Injected by JS -->
   </div>
 
   <!-- Floating info card -->
@@ -394,12 +319,12 @@
       </ul>
       <span class="journey-highlights-heading" style="margin-top:1.5rem">top tools</span>
       <ul class="journey-tools">
-        <li>Figma</li>
-        <li>After Effects</li>
-        <li>Premiere Pro</li>
-        <li>Illustrator</li>
-        <li>Blender</li>
-        <li>VS Code</li>
+        <li>after effects</li>
+        <li>premiere pro</li>
+        <li>illustrator</li>
+        <li>photoshop</li>
+        <li>vs code</li>
+        <li>ai workflows</li>
       </ul>
       <a href="index.html#services" class="journey-cta-btn">back to work</a>
     </div>

@@ -155,23 +155,26 @@
 
       /* ── Journey CTA button in hero ── */
       .hero-journey-cta {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         margin-top: 1.4rem;
-        padding: 0.55rem 1.6rem;
-        border: 1px solid rgba(168, 85, 247, 0.55);
-        border-radius: 2px;
-        color: rgba(168, 85, 247, 0.9);
-        font-size: 0.8rem;
-        letter-spacing: 0.18em;
-        text-transform: lowercase;
+        padding: 0.7rem 1.6rem;
+        background: var(--accent, rgb(168,85,247));
+        border: none;
+        border-radius: 999px;
+        color: #111;
+        font-size: 0.82rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
         text-decoration: none;
-        transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease;
+        font-weight: 600;
+        transition: opacity 0.2s ease, transform 0.2s ease;
       }
       .hero-journey-cta:hover,
       .hero-journey-cta:focus-visible {
-        background: rgba(168, 85, 247, 0.12);
-        border-color: rgba(168, 85, 247, 0.85);
-        color: #fff;
+        opacity: 0.88;
+        transform: scale(1.04);
         outline: none;
       }
       @media (prefers-reduced-motion: reduce) {

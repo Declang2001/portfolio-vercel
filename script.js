@@ -3039,7 +3039,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // CURSOR FX — disabled
 
-// ── Journey page: Portal Run Timeline + Resume Mode ──────────────────────────
+// ── Journey page: 3D Tunnel Fly-Through + Resume Mode ────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.body.classList.contains('journey-page')) return;
 
@@ -3049,68 +3049,134 @@ document.addEventListener('DOMContentLoaded', () => {
   const MILESTONES = [
     { year: 'Los Angeles', title: 'West Coast Origins',
       oneLine: 'Grew up surrounded by visual culture, music, and street art in LA.',
-      tags: ['roots', 'visual culture', 'LA'], nx: 0.10, ny: 0.42 },
+      tags: ['roots', 'visual culture', 'LA'], triggerZ: 80 },
     { year: 'Paris', title: 'Art Studies in Paris',
       oneLine: 'Semester abroad studying fine art and conceptual design at studios in Paris.',
-      tags: ['fine art', 'study abroad', 'concept'], nx: 0.24, ny: 0.63 },
+      tags: ['fine art', 'study abroad', 'concept'], triggerZ: 260 },
     { year: 'Oregon', title: 'BS Art & Technology',
       oneLine: 'University of Oregon — combining fine art, design, and creative computing.',
-      tags: ['degree', 'design', 'tech'], nx: 0.38, ny: 0.30 },
+      tags: ['degree', 'design', 'tech'], triggerZ: 440 },
     { year: '2022', title: 'Amerikid Collective',
       oneLine: 'Co-founded Amerikid, building brand presence, motion content, and social visuals.',
-      tags: ['brand', 'motion', 'web'], nx: 0.52, ny: 0.58 },
-    { year: '2022', title: 'West Coast Illustrations LLC',
-      oneLine: 'Launched studio practice — illustration, brand identity, and visual systems.',
-      tags: ['studio', 'illustration', 'identity'], nx: 0.66, ny: 0.27 },
+      tags: ['brand', 'motion', 'web'], triggerZ: 620 },
     { year: '2023', title: 'Multimedia Consultant, Nile',
       oneLine: 'Editorial comics that turned security topics into fast, on-brand stories.',
-      tags: ['consulting', 'editorial', 'comics'], nx: 0.80, ny: 0.60 },
+      tags: ['consulting', 'editorial', 'comics'], triggerZ: 800 },
+    { year: '2024', title: 'West Coast Illustrations LLC',
+      oneLine: 'Short-form video edits for BrandCo, Shopify site for a west Hollywood boutique, and a dance company website.',
+      tags: ['freelance', 'shopify', 'video'], triggerZ: 960 },
     { year: 'Now', title: 'Design Technologist',
       oneLine: 'Building interactive, motion-led web experiences at the intersection of design and code.',
-      tags: ['interactive', 'motion', 'design tech'], nx: 0.92, ny: 0.40 },
+      tags: ['interactive', 'motion', 'design tech'], triggerZ: 1120 },
   ];
 
   // ── DOM refs ────────────────────────────────────────────────────────────────
-  const cvs            = document.getElementById('journeyCanvas');
-  const portalOverlay  = document.getElementById('journeyPortalOverlay');
-  const cardEl         = document.getElementById('journeyCard');
-  const cardYear       = document.getElementById('jCardYear');
-  const cardTitle      = document.getElementById('jCardTitle');
-  const cardLine       = document.getElementById('jCardLine');
-  const cardTags       = document.getElementById('jCardTags');
-  const resumeEl       = document.getElementById('journeyResume');
-  const timelineEl     = document.getElementById('journeyTimeline');
-  const highlightsEl   = document.getElementById('journeyHighlights');
-  const skipBtn        = document.getElementById('jSkip');
-  const jumpBtn        = document.getElementById('jJump');
-  const resumeBtn      = document.getElementById('jResume');
-  const replayBtn      = document.getElementById('jReplay');
-  if (!cvs || !portalOverlay) return;
+  const cvs        = document.getElementById('journeyCanvas');
+  const cardEl     = document.getElementById('journeyCard');
+  const cardYear   = document.getElementById('jCardYear');
+  const cardTitle  = document.getElementById('jCardTitle');
+  const cardLine   = document.getElementById('jCardLine');
+  const cardTags   = document.getElementById('jCardTags');
+  const resumeEl   = document.getElementById('journeyResume');
+  const timelineEl = document.getElementById('journeyTimeline');
+  const highlightsEl = document.getElementById('journeyHighlights');
+  const skipBtn    = document.getElementById('jSkip');
+  const resumeBtn  = document.getElementById('jResume');
+  const replayBtn  = document.getElementById('jReplay');
+  if (!cvs) return;
 
   const ctx = cvs.getContext('2d');
-  let W = 0, H = 0, dpr = 1;
+  let W = 0, H = 0, cx = 0, cy = 0, dpr = 1;
   let raf = 0;
+  let lastT = 0;
+  let elapsed = 0;
+  let isTunnelMode = !reduced;
+  let done = false;
 
-  // ── State ───────────────────────────────────────────────────────────────────
-  let isPortalMode    = !reduced;
-  let portalPositions = []; // { vx, vy, x, y } — cached, never read inside loop
-  let stars           = [];
-  let portalEls       = [];
-  let currentIdx      = 0;
-  let travX = 0, travY = 0;
-  let phaseStart      = 0;
-  let phase           = 'pause'; // 'travel' | 'pause'
-  const TRAVEL_MS     = 2400;
-  const PAUSE_MS      = 1600;
-  let autoActive      = false;
-  let done            = false;
-  let cardVisible     = false;
+  // ── Tunnel constants ────────────────────────────────────────────────────────
+  const FOV      = 500;
+  const NEAR     = 14;
+  const FAR      = 1800;
+  const SPEED    = 65;
+  const END_Z    = 1300;
+  const CARD_DUR = 1900;
+  let R_TUNNEL   = 300;
+  let NUM_SPARKS = 140;
 
-  // ── Build resume timeline ───────────────────────────────────────────────────
+  // ── Tunnel state ────────────────────────────────────────────────────────────
+  let cameraZ    = 0;
+  let rings      = [];
+  let streaks    = [];
+  let sparks     = [];
+  let pulseRings = [];
+  let msDone     = [];
+  let cardTimer  = 0;
+  let boostEnd   = 0;
+  let boostMul   = 1;
+
+  const NUM_RINGS   = 28;
+  const NUM_STREAKS = 60;
+
+  // ── Factories ───────────────────────────────────────────────────────────────
+  function makeRing(z) {
+    return {
+      z:     z,
+      rFrac: 0.88 + Math.random() * 0.24,
+      alpha: 0.08 + Math.random() * 0.10,
+      seg:   Math.random() < 0.28,
+      phase: Math.random() * Math.PI * 2,
+    };
+  }
+
+  function makeStreak() {
+    return {
+      angle: Math.random() * Math.PI * 2,
+      frac:  Math.random() * 1.15,
+      z:     cameraZ + NEAR + Math.random() * (FAR - NEAR),
+    };
+  }
+
+  function makeSpark() {
+    return {
+      angle:  Math.random() * Math.PI * 2,
+      frac:   0.6 + Math.random() * 0.55,
+      z:      cameraZ + NEAR + Math.random() * (FAR * 0.7),
+      purple: Math.random() < 0.55,
+    };
+  }
+
+  function makePulseRing(now) {
+    return {
+      startT: now,
+      dur:    460 + Math.random() * 240,
+      rFrac:  0.6 + Math.random() * 0.6,
+    };
+  }
+
+  // ── initTunnel ──────────────────────────────────────────────────────────────
+  function initTunnel() {
+    cameraZ    = 0;
+    elapsed    = 0;
+    lastT      = 0;
+    msDone     = MILESTONES.map(function() { return false; });
+    cardTimer  = 0;
+    boostEnd   = 0;
+    boostMul   = 1;
+    rings      = [];
+    streaks    = [];
+    sparks     = [];
+    pulseRings = [];
+    var i;
+    for (i = 0; i < NUM_RINGS;   i++) { rings.push(makeRing(NEAR + (i / NUM_RINGS) * (FAR - NEAR))); }
+    for (i = 0; i < NUM_STREAKS; i++) { streaks.push(makeStreak()); }
+    for (i = 0; i < NUM_SPARKS;  i++) { sparks.push(makeSpark()); }
+  }
+
+  // ── buildTimeline ───────────────────────────────────────────────────────────
   function buildTimeline() {
     timelineEl.innerHTML = '';
-    MILESTONES.forEach((m) => {
-      const li = document.createElement('li');
+    MILESTONES.forEach(function(m) {
+      var li = document.createElement('li');
       li.className = 'journey-timeline-item';
       li.innerHTML =
         '<div class="journey-timeline-year">' + m.year + '</div>' +
@@ -3123,350 +3189,336 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ── Portal HTML nodes ───────────────────────────────────────────────────────
-  function buildPortalEls() {
-    portalOverlay.innerHTML = '';
-    portalEls = [];
-    MILESTONES.forEach(function(m, i) {
-      const btn = document.createElement('button');
-      btn.className = 'journey-portal';
-      btn.setAttribute('aria-label', m.year + ': ' + m.title);
-      btn.dataset.idx = String(i);
-      const lbl = document.createElement('span');
-      lbl.className = 'journey-portal-label';
-      lbl.textContent = m.year;
-      lbl.setAttribute('aria-hidden', 'true');
-      btn.appendChild(lbl);
-      btn.addEventListener('click', function() { jumpToPortal(i); });
-      btn.addEventListener('mouseenter', function() { showCard(i); });
-      btn.addEventListener('mouseleave', function() {
-        if (currentIdx !== i || !autoActive) hideCard();
-      });
-      btn.addEventListener('focus', function() { showCard(i); });
-      btn.addEventListener('blur', function() {
-        if (currentIdx !== i) hideCard();
-      });
-      portalOverlay.appendChild(btn);
-      portalEls.push(btn);
-    });
-  }
-
-  function positionPortalEls() {
-    portalEls.forEach(function(el, i) {
-      if (!portalPositions[i]) return;
-      el.style.left = portalPositions[i].vx + 'px';
-      el.style.top  = portalPositions[i].vy + 'px';
-    });
-  }
-
-  // ── Stars (rebuilt on resize, drawn every frame but never per-layout-read) ──
-  function buildStars() {
-    var count = Math.min(Math.floor((W * H) / (dpr * dpr * 2800)), 180);
-    stars = [];
-    for (var i = 0; i < count; i++) {
-      stars.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        r: (0.35 + Math.random() * 0.75) * dpr,
-        a: 0.1 + Math.random() * 0.35,
-      });
-    }
-  }
-
-  // ── Resize: recompute portal positions (no getBoundingClientRect in loop) ───
+  // ── resize ──────────────────────────────────────────────────────────────────
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
-    W = Math.round(vw * dpr);
-    H = Math.round(vh * dpr);
+    dpr        = Math.min(window.devicePixelRatio || 1, 2);
+    W          = Math.round(window.innerWidth  * dpr);
+    H          = Math.round(window.innerHeight * dpr);
+    cx         = W * 0.5;
+    cy         = H * 0.5;
+    R_TUNNEL   = H * 0.16;
+    NUM_SPARKS = dpr <= 1 ? 130 : 170;
     cvs.width  = W;
     cvs.height = H;
-    var headerH = 64;
-    var topPad  = headerH + 72;
-    var botPad  = 72;
-    var usableH = vh - topPad - botPad;
-    portalPositions = MILESTONES.map(function(m) {
-      var vx = Math.round(m.nx * vw);
-      var vy = Math.round(topPad + m.ny * usableH);
-      return { vx: vx, vy: vy, x: Math.round(vx * dpr), y: Math.round(vy * dpr) };
-    });
-    buildStars();
-    if (portalEls.length) positionPortalEls();
-    if (cardVisible && portalPositions[currentIdx]) placeCard(currentIdx);
   }
 
-  // ── Info card ───────────────────────────────────────────────────────────────
-  function showCard(idx) {
-    var m = MILESTONES[idx];
-    if (!m) return;
+  // ── showCard / hideCard ─────────────────────────────────────────────────────
+  function showCard(m) {
     cardYear.textContent  = m.year;
     cardTitle.textContent = m.title;
     cardLine.textContent  = m.oneLine;
     cardTags.innerHTML    = m.tags.map(function(t) {
       return '<span class="journey-card-tag">' + t + '</span>';
     }).join('');
-    placeCard(idx);
+    var cw = cardEl.offsetWidth  || 270;
+    var ch = cardEl.offsetHeight || 130;
+    var vw = W / dpr;
+    var vh = H / dpr;
+    cardEl.style.left = Math.round((vw - cw) * 0.5) + 'px';
+    cardEl.style.top  = Math.round(vh * 0.44 - ch * 0.5) + 'px';
     cardEl.classList.add('is-visible');
-    cardVisible = true;
-  }
-
-  function placeCard(idx) {
-    if (!portalPositions[idx]) return;
-    var vx = portalPositions[idx].vx;
-    var vy = portalPositions[idx].vy;
-    var cw = 278, ch = 145;
-    var vw = window.innerWidth, vh = window.innerHeight;
-    var left = vx + 34;
-    var top  = vy - 24;
-    if (left + cw > vw - 12) left = vx - cw - 34;
-    if (top  + ch > vh - 12) top  = vh - ch - 12;
-    if (top  < 80)           top  = 80;
-    left = Math.max(8, left);
-    cardEl.style.left = left + 'px';
-    cardEl.style.top  = top  + 'px';
   }
 
   function hideCard() {
     cardEl.classList.remove('is-visible');
-    cardVisible = false;
+    cardTimer = 0;
   }
 
   // ── Mode switching ──────────────────────────────────────────────────────────
   function showResumeMode() {
-    isPortalMode = false;
+    isTunnelMode = false;
     cancelAnim();
-    portalOverlay.hidden = true;
+    cvs.style.transition = 'opacity 0.25s ease';
+    cvs.style.opacity    = '0';
+    setTimeout(function() { cvs.hidden = true; }, 300);
     hideCard();
-    resumeEl.hidden      = false;
-    highlightsEl.hidden  = false;
-    if (resumeBtn) resumeBtn.textContent = 'portal run';
+    resumeEl.hidden     = false;
+    highlightsEl.hidden = false;
+    var scrollTarget = (resumeEl.offsetTop || 0) - 80;
+    window.scrollTo(0, Math.max(0, scrollTarget));
+    if (resumeBtn) resumeBtn.textContent = 'tunnel run';
     if (skipBtn)   skipBtn.hidden  = true;
-    if (jumpBtn)   jumpBtn.hidden  = true;
     if (replayBtn && !reduced) replayBtn.hidden = false;
   }
 
-  function showPortalMode() {
-    isPortalMode = true;
-    resumeEl.hidden = true;
-    if (!done) highlightsEl.hidden = true;
-    portalOverlay.hidden = false;
+  function showTunnelMode() {
+    isTunnelMode = true;
+    resumeEl.hidden     = true;
+    highlightsEl.hidden = true;
+    cvs.hidden = false;
+    cvs.style.transition = '';
+    cvs.style.opacity    = '1';
+    hideCard();
+    done = false;
     if (resumeBtn) resumeBtn.textContent = 'resume mode';
     if (skipBtn)   skipBtn.hidden  = false;
-    if (jumpBtn)   jumpBtn.hidden  = false;
     if (replayBtn) replayBtn.hidden = true;
-    startAuto();
+    initTunnel();
+    startAnim();
   }
 
   function endAnimation() {
     done = true;
-    autoActive = false;
-    cancelAnim();
-    portalEls.forEach(function(el) {
-      el.classList.add('is-visited');
-      el.classList.remove('is-active');
-    });
-    hideCard();
-    highlightsEl.hidden = false;
-    if (skipBtn)   skipBtn.hidden  = true;
-    if (jumpBtn)   jumpBtn.hidden  = true;
-    if (replayBtn && !reduced) replayBtn.hidden = false;
+    showResumeMode();
   }
 
   function cancelAnim() {
-    autoActive = false;
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
   }
 
-  function doReplay() {
-    done = false;
-    currentIdx = 0;
-    portalEls.forEach(function(el) {
-      el.classList.remove('is-visited', 'is-active');
-    });
-    hideCard();
-    highlightsEl.hidden  = true;
-    resumeEl.hidden      = true;
-    portalOverlay.hidden = false;
-    isPortalMode         = true;
-    if (resumeBtn) resumeBtn.textContent = 'resume mode';
-    if (skipBtn)   skipBtn.hidden  = false;
-    if (jumpBtn)   jumpBtn.hidden  = false;
-    if (replayBtn) replayBtn.hidden = true;
-    startAuto();
-  }
-
-  // ── Auto sequence ───────────────────────────────────────────────────────────
-  function startAuto() {
-    if (reduced) return;
+  function startAnim() {
     cancelAnim();
-    autoActive  = true;
-    currentIdx  = 0;
-    if (portalPositions[0]) { travX = portalPositions[0].x; travY = portalPositions[0].y; }
-    phaseStart  = performance.now();
-    phase       = 'pause';
-    showCard(0);
-    if (portalEls[0]) portalEls[0].classList.add('is-active');
     raf = requestAnimationFrame(loop);
   }
 
-  function jumpToPortal(idx) {
-    if (idx < 0 || idx >= MILESTONES.length) return;
-    autoActive  = true;
-    currentIdx  = idx;
-    portalEls.forEach(function(el, i) {
-      el.classList.toggle('is-visited', i < idx);
-      el.classList.toggle('is-active',  i === idx);
-    });
-    if (portalPositions[idx]) { travX = portalPositions[idx].x; travY = portalPositions[idx].y; }
-    phaseStart = performance.now();
-    phase      = 'pause';
-    showCard(idx);
-    if (!raf) raf = requestAnimationFrame(loop);
+  // ── Milestone pulse ─────────────────────────────────────────────────────────
+  function triggerPulse(now) {
+    var p, sp;
+    for (p = 0; p < 8; p++) { pulseRings.push(makePulseRing(now)); }
+    for (p = 0; p < 15; p++) {
+      sp   = makeSpark();
+      sp.z = cameraZ + NEAR + Math.random() * 80;
+      sparks.push(sp);
+    }
+    if (sparks.length > NUM_SPARKS + 35) { sparks.splice(0, sparks.length - (NUM_SPARKS + 35)); }
   }
 
-  // ── Animation loop ──────────────────────────────────────────────────────────
-  function easeInOut(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  // ── drawHaze ────────────────────────────────────────────────────────────────
+  function drawHaze() {
+    var r   = R_TUNNEL * (FOV / 180);
+    var grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grd.addColorStop(0,   'rgba(168,85,247,0.032)');
+    grd.addColorStop(0.5, 'rgba(110,35,190,0.015)');
+    grd.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle   = grd;
+    ctx.fillRect(0, 0, W, H);
   }
 
+  // ── drawRing (2-pass glow + bright edge) ────────────────────────────────────
+  function drawRing(ring) {
+    var relZ = ring.z - cameraZ;
+    if (relZ < NEAR || relZ > FAR) return;
+    var scale   = FOV / relZ;
+    var screenR = ring.rFrac * R_TUNNEL * scale;
+    if (screenR < 2) return;
+    var fade = Math.min(1, (relZ - NEAR) / 80) * Math.min(1, (FAR - relZ) / 400);
+    var rot  = ring.phase + elapsed * 0.04;
+    var i, a0, a1, steps;
+
+    if (ring.seg) {
+      steps = 28;
+      // Pass 1 — glow arcs
+      ctx.globalAlpha = ring.alpha * 0.55 * fade;
+      ctx.strokeStyle = 'rgba(168,85,247,1)';
+      ctx.lineWidth   = Math.max(1.5, 4 * scale);
+      ctx.beginPath();
+      for (i = 0; i < steps; i += 2) {
+        a0 = (i / steps) * Math.PI * 2;
+        a1 = ((i + 0.72) / steps) * Math.PI * 2;
+        ctx.moveTo(cx + Math.cos(a0) * screenR, cy + Math.sin(a0) * screenR);
+        ctx.arc(cx, cy, screenR, a0, a1);
+      }
+      ctx.stroke();
+      // Pass 2 — bright edge
+      ctx.globalAlpha = ring.alpha * 1.7 * fade;
+      ctx.strokeStyle = 'rgba(210,155,255,1)';
+      ctx.lineWidth   = Math.max(0.5, 1.1 * scale);
+      ctx.beginPath();
+      for (i = 0; i < steps; i += 2) {
+        a0 = (i / steps) * Math.PI * 2;
+        a1 = ((i + 0.72) / steps) * Math.PI * 2;
+        ctx.moveTo(cx + Math.cos(a0) * screenR, cy + Math.sin(a0) * screenR);
+        ctx.arc(cx, cy, screenR, a0, a1);
+      }
+      ctx.stroke();
+    } else {
+      // Pass 1 — glow ellipse
+      ctx.globalAlpha = ring.alpha * 0.55 * fade;
+      ctx.strokeStyle = 'rgba(168,85,247,1)';
+      ctx.lineWidth   = Math.max(1.5, 4 * scale);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, screenR, screenR * 0.6, rot, 0, Math.PI * 2);
+      ctx.stroke();
+      // Pass 2 — bright edge
+      ctx.globalAlpha = ring.alpha * 1.7 * fade;
+      ctx.strokeStyle = 'rgba(210,155,255,1)';
+      ctx.lineWidth   = Math.max(0.5, 1.1 * scale);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, screenR, screenR * 0.6, rot, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // ── drawStreak ──────────────────────────────────────────────────────────────
+  function drawStreak(streak, spd, dt) {
+    var relZ = streak.z - cameraZ;
+    if (relZ < NEAR || relZ > FAR) return;
+    var s0 = FOV / (relZ + spd * dt);
+    var s1 = FOV / relZ;
+    var wx = Math.cos(streak.angle) * streak.frac * R_TUNNEL;
+    var wy = Math.sin(streak.angle) * streak.frac * R_TUNNEL;
+    var fadeNear = Math.min(1, (relZ - NEAR) / 30);
+    ctx.globalAlpha = (0.15 + 0.28 * Math.min(1, spd * dt * 10 / relZ)) * fadeNear;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth   = Math.max(0.4, 0.9 * s1);
+    ctx.beginPath();
+    ctx.moveTo(cx + wx * s0, cy + wy * s0);
+    ctx.lineTo(cx + wx * s1, cy + wy * s1);
+    ctx.stroke();
+  }
+
+  // ── drawSpark ───────────────────────────────────────────────────────────────
+  function drawSpark(spark, spd, dt) {
+    var relZ = spark.z - cameraZ;
+    if (relZ < NEAR || relZ > FAR) return;
+    var s1  = FOV / relZ;
+    var s0  = FOV / Math.max(NEAR + 1, relZ + spd * dt * 2.5);
+    var wx  = Math.cos(spark.angle) * spark.frac * R_TUNNEL;
+    var wy  = Math.sin(spark.angle) * spark.frac * R_TUNNEL;
+    var fadeNear = Math.min(1, (relZ - NEAR) / 22);
+    ctx.globalAlpha = (0.38 + Math.random() * 0.28) * fadeNear;
+    ctx.strokeStyle = spark.purple ? 'rgba(178,95,255,1)' : 'rgba(225,195,255,1)';
+    ctx.lineWidth   = Math.max(0.8, 1.8 * s1);
+    ctx.beginPath();
+    ctx.moveTo(cx + wx * s0, cy + wy * s0);
+    ctx.lineTo(cx + wx * s1, cy + wy * s1);
+    ctx.stroke();
+    ctx.globalAlpha *= 0.9;
+    ctx.fillStyle = spark.purple ? 'rgba(200,140,255,1)' : '#fff';
+    ctx.beginPath();
+    ctx.arc(cx + wx * s1, cy + wy * s1, Math.max(0.8, 2 * s1), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── drawPulseRings ──────────────────────────────────────────────────────────
+  function drawPulseRings(now) {
+    var i, pr, t, expandR;
+    for (i = pulseRings.length - 1; i >= 0; i--) {
+      pr = pulseRings[i];
+      t  = (now - pr.startT) / pr.dur;
+      if (t >= 1) { pulseRings.splice(i, 1); continue; }
+      expandR = pr.rFrac * R_TUNNEL * (FOV / (NEAR + 28)) * (0.25 + t * 0.75);
+      ctx.globalAlpha = 0.65 * (1 - t);
+      ctx.strokeStyle = 'rgba(210,155,255,1)';
+      ctx.lineWidth   = Math.max(0.5, 2.8 * (1 - t * 0.6));
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, expandR, expandR * 0.6, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // ── main loop ───────────────────────────────────────────────────────────────
   function loop(now) {
-    // Clear every frame — no trails guarantee
+    if (!lastT) lastT = now;
+    var dt = Math.min((now - lastT) / 1000, 0.05);
+    lastT   = now;
+    elapsed += dt;
+
+    boostMul = (now < boostEnd) ? 1.6 : 1;
+    var spd  = SPEED * boostMul;
+
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, W, H);
 
-    if (!isPortalMode) { raf = 0; return; }
+    if (!isTunnelMode) { raf = 0; return; }
 
-    drawStars();
+    cameraZ += spd * dt;
 
-    if (autoActive && portalPositions.length) {
-      var elapsed = now - phaseStart;
+    // Haze
+    drawHaze();
 
-      if (phase === 'travel') {
-        var raw = Math.min(elapsed / TRAVEL_MS, 1);
-        var t   = easeInOut(raw);
-        var frm = portalPositions[currentIdx - 1];
-        var to  = portalPositions[currentIdx];
-        if (frm && to) {
-          var cpx = (frm.x + to.x) * 0.5 + (to.y - frm.y) * 0.2;
-          var cpy = (frm.y + to.y) * 0.5 - Math.abs(to.x - frm.x) * 0.12;
-          var mt  = 1 - t;
-          travX = mt * mt * frm.x + 2 * mt * t * cpx + t * t * to.x;
-          travY = mt * mt * frm.y + 2 * mt * t * cpy + t * t * to.y;
-          drawBeam(frm, to, cpx, cpy, t);
-        }
-        if (raw >= 1) {
-          travX = portalPositions[currentIdx].x;
-          travY = portalPositions[currentIdx].y;
-          if (portalEls[currentIdx]) portalEls[currentIdx].classList.add('is-active');
-          showCard(currentIdx);
-          phaseStart = now;
-          phase = 'pause';
-        }
+    ctx.lineCap = 'round';
 
-      } else { // pause
-        if (elapsed >= PAUSE_MS) {
-          if (portalEls[currentIdx]) {
-            portalEls[currentIdx].classList.remove('is-active');
-            portalEls[currentIdx].classList.add('is-visited');
-          }
-          currentIdx++;
-          if (currentIdx >= MILESTONES.length) {
-            drawTraveler();
-            endAnimation();
-            raf = 0;
-            return;
-          }
-          hideCard();
-          phaseStart = now;
-          phase = 'travel';
-        }
+    // Rings
+    var i, ring, streak, spark;
+    for (i = 0; i < rings.length; i++) {
+      ring = rings[i];
+      if (ring.z - cameraZ < NEAR) {
+        ring.z     = cameraZ + FAR * (0.65 + Math.random() * 0.35);
+        ring.rFrac = 0.88 + Math.random() * 0.24;
+        ring.alpha = 0.08 + Math.random() * 0.10;
+        ring.seg   = Math.random() < 0.28;
+        ring.phase = Math.random() * Math.PI * 2;
       }
+      drawRing(ring);
     }
 
-    drawTraveler();
+    // Streaks
+    ctx.lineCap = 'butt';
+    for (i = 0; i < streaks.length; i++) {
+      streak = streaks[i];
+      if (streak.z - cameraZ < NEAR) {
+        streak.angle = Math.random() * Math.PI * 2;
+        streak.frac  = Math.random() * 1.15;
+        streak.z     = cameraZ + FAR * (0.5 + Math.random() * 0.5);
+      }
+      drawStreak(streak, spd, dt);
+    }
+
+    // Sparks
+    for (i = 0; i < sparks.length; i++) {
+      spark = sparks[i];
+      if (spark.z - cameraZ < NEAR) {
+        spark.angle  = Math.random() * Math.PI * 2;
+        spark.frac   = 0.6 + Math.random() * 0.55;
+        spark.z      = cameraZ + NEAR + Math.random() * (FAR * 0.7);
+        spark.purple = Math.random() < 0.55;
+      }
+      drawSpark(spark, spd, dt);
+    }
+
+    // Pulse rings
+    ctx.lineCap = 'round';
+    drawPulseRings(now);
+
+    ctx.globalAlpha = 1;
+
+    // Milestones
+    var m;
+    for (m = 0; m < MILESTONES.length; m++) {
+      if (!msDone[m] && cameraZ >= MILESTONES[m].triggerZ) {
+        msDone[m]  = true;
+        cardTimer  = now + CARD_DUR;
+        showCard(MILESTONES[m]);
+        triggerPulse(now);
+      }
+    }
+    if (cardTimer && now > cardTimer) hideCard();
+
+    if (cameraZ >= END_Z) { endAnimation(); return; }
+
     raf = requestAnimationFrame(loop);
   }
 
-  // ── Canvas drawing helpers ──────────────────────────────────────────────────
-  function drawStars() {
-    ctx.fillStyle = '#fff';
-    for (var i = 0; i < stars.length; i++) {
-      var s = stars[i];
-      ctx.globalAlpha = s.a;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, 6.283);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  function drawTraveler() {
-    if (!travX && !travY) return;
-    ctx.globalAlpha = 0.15;
-    ctx.fillStyle = 'rgb(168,85,247)';
-    ctx.beginPath(); ctx.arc(travX, travY, 20 * dpr, 0, 6.283); ctx.fill();
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = 'rgb(200,140,255)';
-    ctx.beginPath(); ctx.arc(travX, travY, 7 * dpr, 0, 6.283); ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(travX, travY, 2.5 * dpr, 0, 6.283); ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
-  function drawBeam(frm, to, cpx, cpy, t) {
-    if (t <= 0.02) return;
-    ctx.save();
-    ctx.globalAlpha = 0.16;
-    ctx.strokeStyle = 'rgb(168,85,247)';
-    ctx.lineWidth   = 1.2 * dpr;
-    ctx.lineCap     = 'round';
-    ctx.beginPath();
-    ctx.moveTo(frm.x, frm.y);
-    var steps = 18;
-    for (var s = 1; s <= steps; s++) {
-      var st = (s / steps) * t;
-      var mt = 1 - st;
-      ctx.lineTo(
-        mt * mt * frm.x + 2 * mt * st * cpx + st * st * to.x,
-        mt * mt * frm.y + 2 * mt * st * cpy + st * st * to.y
-      );
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
   // ── Controls ────────────────────────────────────────────────────────────────
-  if (skipBtn)   skipBtn.addEventListener('click',   endAnimation);
-  if (jumpBtn)   jumpBtn.addEventListener('click',   function() {
-    endAnimation();
-    highlightsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
+  if (skipBtn)   skipBtn.addEventListener('click',  endAnimation);
   if (resumeBtn) resumeBtn.addEventListener('click', function() {
-    if (isPortalMode) showResumeMode(); else showPortalMode();
+    if (isTunnelMode) showResumeMode(); else showTunnelMode();
   });
-  if (replayBtn) replayBtn.addEventListener('click', doReplay);
+  if (replayBtn) replayBtn.addEventListener('click', showTunnelMode);
 
-  // ── Init ─────────────────────────────────────────────────────────────────────
+  // Click anywhere → 500 ms speed boost
+  document.addEventListener('click', function() {
+    if (!isTunnelMode || done) return;
+    boostEnd = performance.now() + 500;
+  }, { passive: true });
+
+  // ── Init ────────────────────────────────────────────────────────────────────
   buildTimeline();
-  buildPortalEls();
   resize();
+  window.addEventListener('resize', resize, { passive: true });
 
   if (reduced) {
-    cvs.hidden           = true;
-    portalOverlay.hidden = true;
-    resumeEl.hidden      = false;
-    highlightsEl.hidden  = false;
-    isPortalMode         = false;
-    if (skipBtn)   skipBtn.hidden   = true;
-    if (jumpBtn)   jumpBtn.hidden   = true;
-    if (resumeBtn) resumeBtn.textContent = 'portal run';
+    cvs.hidden          = true;
+    resumeEl.hidden     = false;
+    highlightsEl.hidden = false;
+    isTunnelMode        = false;
+    if (skipBtn)   skipBtn.hidden  = true;
+    if (resumeBtn) resumeBtn.textContent = 'tunnel run';
   } else {
-    portalOverlay.hidden = false;
-    startAuto();
+    initTunnel();
+    startAnim();
   }
-
-  window.addEventListener('resize', function() { resize(); }, { passive: true });
 });
