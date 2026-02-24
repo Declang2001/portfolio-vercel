@@ -2152,11 +2152,38 @@ document.addEventListener('DOMContentLoaded', () => {
       },
 
       updateRect: updateCanvasRect,
-      onResize: doResize
+      onResize: doResize,
+
+      // Mobile tap pulse: shockwave + burst particles at a touch point (coarse-safe).
+      touchPulse(clientX, clientY) {
+        if (reduced || !W || intensity <= 0) return;
+        // One-time rect read to map touch → canvas coords
+        updateCanvasRect();
+        if (!canvasRect.width) return;
+        const cx = ((clientX - canvasRect.left) / canvasRect.width) * W;
+        const cy = ((clientY - canvasRect.top)  / canvasRect.height) * H;
+        spawnShockwave(cx, cy, CFG.COLORS[0]);
+        for (let i = 0; i < 12; i++) {
+          const p = makeParticle(cx, cy);
+          const a = (i / 12) * Math.PI * 2;
+          p.bvx = Math.cos(a) * rnd(1.5, 4); p.bvy = Math.sin(a) * rnd(1.5, 4);
+          particles.push(p);
+        }
+        start();
+      }
     };
   })();
 
   drift.init();
+
+  // Mobile touch pulse: tap the hero area to get a brief particle burst.
+  // Only fires when the drift canvas is active (intensity > 0 = hero visible).
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    videoWrapper.addEventListener('touchend', (ev) => {
+      const t = ev.changedTouches[0];
+      drift.touchPulse(t.clientX, t.clientY);
+    }, { passive: true });
+  }
 
   // ── Particle-to-text handoff: overlay messenger to heading ──
   // Messengers render on a FIXED overlay canvas so they are not clipped by
@@ -2178,8 +2205,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (hoFlying) { hoPendingResize = true; return; }
       const vp = _wcsViewport.getViewport();
       hoDpr = _wcsViewport.getDprCap();
-      hoW = Math.round(vp.vw * hoDpr);
-      hoH = Math.round(vp.vh * hoDpr);
+      const nW = Math.round(vp.vw * hoDpr);
+      const nH = Math.round(vp.vh * hoDpr);
+      // Skip if unchanged — avoids canvas clear on every iOS address-bar scroll event.
+      if (nW === hoW && nH === hoH) return;
+      hoW = nW; hoH = nH;
       hoCvs.width = hoW;
       hoCvs.height = hoH;
     }
@@ -2317,9 +2347,109 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let ticking = false;
   let lastProgress = -1;
+  let workIgniteFired = false;
+  // Cache viewport height so iOS address-bar collapse mid-scroll doesn't jitter the scale.
+  let cachedViewportH = window.innerHeight;
+
+  // One-shot WORK ignition: particle peels off "work" → bezier travel → hero burst.
+  function fireWorkIgnition() {
+    if (!workAccent || !videoWrapper) return;
+    workAccent.classList.add('is-igniting');
+    // Remove the glow class after the animation completes so the element resets cleanly.
+    setTimeout(() => { workAccent.classList.remove('is-igniting'); }, 700);
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      drift.checkSeedBurst(0.36);
+      window._conduitSpike?.();
+      return;
+    }
+
+    // One-time rects for bezier endpoints (only getBoundingClientRect call in ignition)
+    const srcRect = workAccent.getBoundingClientRect();
+    const dstRect = videoWrapper.getBoundingClientRect();
+    const sx = srcRect.left + srcRect.width  / 2;
+    const sy = srcRect.top  + srcRect.height / 2;
+    const dx = dstRect.left + dstRect.width  / 2;
+    const dy = dstRect.top  + dstRect.height / 2;
+    const arcX = (sx + dx) / 2 + (Math.random() - 0.5) * 160;
+    const arcY = Math.min(sy, dy) - 80 - Math.random() * 60;
+
+    const igCvs = document.createElement('canvas');
+    igCvs.setAttribute('aria-hidden', 'true');
+    igCvs.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60;';
+    document.body.appendChild(igCvs);
+    const igCtx  = igCvs.getContext('2d');
+    const igDpr  = Math.min(window.devicePixelRatio || 1, 2);
+    igCvs.width  = Math.round(window.innerWidth  * igDpr);
+    igCvs.height = Math.round(window.innerHeight * igDpr);
+
+    const TRAVEL_MS = 750;
+    const igStart  = performance.now();
+    // Trail: ring buffer of the last N canvas positions
+    const TRAIL_LEN = 6;
+    const trail = [];
+
+    function igTick(now) {
+      const raw = Math.min((now - igStart) / TRAVEL_MS, 1);
+      const mt  = 1 - raw;
+      // Quadratic bezier position in viewport px
+      const vx  = mt * mt * sx + 2 * mt * raw * arcX + raw * raw * dx;
+      const vy  = mt * mt * sy + 2 * mt * raw * arcY + raw * raw * dy;
+      // Convert to canvas px
+      const cpx = vx * igDpr;
+      const cpy = vy * igDpr;
+
+      igCtx.globalCompositeOperation = 'source-over';
+      igCtx.clearRect(0, 0, igCvs.width, igCvs.height);
+
+      if (raw < 1) {
+        // Push to trail (oldest first)
+        trail.push({ x: cpx, y: cpy });
+        if (trail.length > TRAIL_LEN) trail.shift();
+
+        const fadeOut = raw > 0.75 ? 1 - (raw - 0.75) / 0.25 : 1;
+
+        // Draw fading trail dots (smallest and most transparent first)
+        for (let i = 0; i < trail.length - 1; i++) {
+          const tfrac = i / (TRAIL_LEN - 1);
+          const tr    = (1.5 + tfrac * 2) * igDpr;
+          igCtx.globalAlpha = fadeOut * tfrac * 0.45;
+          igCtx.fillStyle   = 'rgb(168,85,247)';
+          igCtx.beginPath(); igCtx.arc(trail[i].x, trail[i].y, tr, 0, 6.283); igCtx.fill();
+        }
+
+        // Core particle — larger and with a bloom halo
+        const r = 5 * igDpr;
+        igCtx.globalAlpha = fadeOut;
+        igCtx.fillStyle   = 'rgb(210,160,255)'; // slightly lighter center
+        igCtx.beginPath(); igCtx.arc(cpx, cpy, r, 0, 6.283); igCtx.fill();
+        // Inner bright core
+        igCtx.fillStyle = '#fff';
+        igCtx.globalAlpha = fadeOut * 0.7;
+        igCtx.beginPath(); igCtx.arc(cpx, cpy, r * 0.45, 0, 6.283); igCtx.fill();
+        // Outer glow ring
+        igCtx.fillStyle   = 'rgb(168,85,247)';
+        igCtx.globalAlpha = fadeOut * 0.25;
+        igCtx.beginPath(); igCtx.arc(cpx, cpy, r * 3.5, 0, 6.283); igCtx.fill();
+
+        requestAnimationFrame(igTick);
+      } else {
+        igCtx.clearRect(0, 0, igCvs.width, igCvs.height);
+        igCvs.remove();
+        // Attempt hero video play (fails silently if no element or blocked)
+        const heroVid = videoWrapper.querySelector('video');
+        if (heroVid) heroVid.play().catch(() => {});
+        // Trigger existing hero burst system
+        drift.checkSeedBurst(0.36);
+        window._conduitSpike?.();
+      }
+    }
+    requestAnimationFrame(igTick);
+  }
 
   function update() {
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const viewportHeight = cachedViewportH;
     const start = approachHero.offsetTop;
     const end = start + approachHero.offsetHeight - viewportHeight;
     const scrollY = window.scrollY || window.pageYOffset;
@@ -2391,6 +2521,10 @@ document.addEventListener('DOMContentLoaded', () => {
     drift.updateRect();
     drift.setIntensity(e);
     drift.checkSeedBurst(progress);
+    if (progress >= 0.30 && !workIgniteFired) {
+      workIgniteFired = true;
+      fireWorkIgnition();
+    }
 
     ticking = false;
   }
@@ -2405,10 +2539,15 @@ document.addEventListener('DOMContentLoaded', () => {
   update();
   window.addEventListener('scroll', requestTick, { passive: true });
   window.addEventListener('resize', () => {
+    cachedViewportH = window.innerHeight;
     lastProgress = -1;
     drift.onResize();
     update();
   });
+  window.addEventListener('orientationchange', () => {
+    cachedViewportH = window.innerHeight;
+    lastProgress = -1;
+  }, { passive: true });
 });
 
 
@@ -2426,7 +2565,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const FALLBACK_PURPLE_RGB2 = [168, 85, 247];
   const MAIN_N = 4, MICRO_N = 2;
-  const PARTICLE_BUDGET = 110;
+  const PARTICLE_BUDGET = 70;
 
   const vv = window.visualViewport;
   const getVP = () => vv ? { ox: vv.offsetLeft, oy: vv.offsetTop } : { ox: 0, oy: 0 };
@@ -2434,7 +2573,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const cvs = document.createElement('canvas');
   cvs.setAttribute('aria-hidden', 'true');
-  cvs.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:25;';
+  cvs.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;';
   document.body.appendChild(cvs);
   const ctx2 = cvs.getContext('2d');
   let W2 = 0, H2 = 0, dpr2 = 1;
@@ -2448,7 +2587,7 @@ document.addEventListener('DOMContentLoaded', () => {
   resize2();
 
   let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
-  let startTime2 = 0, activePanel2 = null;
+  let startTime2 = 0, activePanel2 = null, spikeUntil2 = 0;
   let srcPts2 = [], srcSeeds2 = [], anchors2 = [], beams2 = [], particles2 = [];
   let heroRect2 = null, heroVisibleFactor2 = 0;
   // Read --accent from :root once; never sample headline text (which is white by default)
@@ -2457,6 +2596,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const tetherRGB2 = purpleRGB2; // constant reference — color never changes
   let panelRO2 = null;
   const rnd2 = (a, b) => Math.random() * (b - a) + a;
+  window._conduitSpike = () => { spikeUntil2 = performance.now() + 900; };
 
   function parseColorToRGB2(color) {
     if (!color) return null;
@@ -2574,10 +2714,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const midY = (sy + ay) * 0.5 + rnd2(-35, 35) * dpr2;
     particles2.push({
       x0: sx, y0: sy, cx: midX, cy: midY, x1: ax, y1: ay,
-      t: 0, spd: rnd2(0.006, 0.014),
+      t: 0, spd: rnd2(0.003, 0.007),
       jx: rnd2(-1.5, 1.5) * dpr2, jy: rnd2(-1.5, 1.5) * dpr2,
-      alpha: rnd2(0.55, 0.95),
-      r: rnd2(1.0, 2.0) * dpr2,
+      alpha: rnd2(0.38, 0.65),
+      r: rnd2(0.5, 1.2) * dpr2,
     });
   }
 
@@ -2604,16 +2744,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const oscY = Math.cos(elapsed * 0.6 + i * 0.9) * 14 * dpr2;
         const mx = (sx + ax) * 0.5 + oscX;
         const my = (sy + ay) * 0.5 + oscY;
-        ctx2.globalAlpha = fadeAlpha2 * 0.11;
+        ctx2.globalAlpha = fadeAlpha2 * 0.045;
         ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
       }
       ctx2.restore();
 
-      // Spawn new particles while fading in / stable and under budget
-      if (particles2.length < PARTICLE_BUDGET && fadeDir2 >= 0) {
-        // heroSpawnRatio: lerp(0.1, 0.7, heroVisibleFactor2)
-        const heroSpawnRatio = 0.1 + 0.6 * heroVisibleFactor2;
-        const spawnCount = Math.min(3, PARTICLE_BUDGET - particles2.length);
+      // Spawn new particles while fading in / stable and under budget.
+      // During spike: higher budget and spawn cap for a brief surge.
+      const spiking2     = performance.now() < spikeUntil2;
+      const effBudget2   = spiking2 ? 140 : PARTICLE_BUDGET;
+      const effSpawnCap2 = spiking2 ? 4 : 2;
+      if (particles2.length < effBudget2 && fadeDir2 >= 0) {
+        const heroSpawnRatio = 0.25 + 0.7 * heroVisibleFactor2;
+        const spawnCount = Math.min(effSpawnCap2, effBudget2 - particles2.length);
         for (let i = 0; i < spawnCount; i++) {
           spawnParticle2(Math.random() < heroSpawnRatio);
         }
@@ -2627,14 +2770,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (p.t >= 1) { particles2.splice(i, 1); continue; }
         const [bx, by] = bezPt2(p.t, p.x0, p.y0, p.cx, p.cy, p.x1, p.y1);
         // Jitter fades toward zero as particle approaches the anchor
-        const px = bx + p.jx * (1 - p.t);
-        const py = by + p.jy * (1 - p.t);
+        const ptx = bx + p.jx * (1 - p.t);
+        const pty = by + p.jy * (1 - p.t);
         // Fade in quickly, fade out in the last 15% of travel
         const fadeIn  = Math.min(p.t * 8, 1);
         const fadeOut = p.t > 0.85 ? 1 - (p.t - 0.85) / 0.15 : 1;
-        ctx2.globalAlpha = fadeAlpha2 * p.alpha * fadeIn * fadeOut;
+        // Hero exclusion: soft-fade particles overlapping the hero rect
+        let heroFade = 1;
+        if (heroRect2) {
+          const vp3     = getVP();
+          const vx3     = ptx / dpr2 + vp3.ox;
+          const vy3     = pty / dpr2 + vp3.oy;
+          const excMgn  = 28;
+          const minDist = Math.min(
+            vx3 - heroRect2.left, heroRect2.right  - vx3,
+            vy3 - heroRect2.top,  heroRect2.bottom - vy3
+          );
+          if (minDist < excMgn) heroFade = Math.max(0, minDist / excMgn);
+        }
+        ctx2.globalAlpha = fadeAlpha2 * p.alpha * fadeIn * fadeOut * heroFade;
         ctx2.fillStyle = `rgb(${cr},${cg},${cb})`;
-        ctx2.beginPath(); ctx2.arc(px, py, p.r, 0, 6.283); ctx2.fill();
+        ctx2.beginPath(); ctx2.arc(ptx, pty, p.r, 0, 6.283); ctx2.fill();
       }
       ctx2.restore();
     }

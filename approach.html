@@ -5,6 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Approach - West Coast Studio</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    @keyframes work-ignite-k {
+      0%   { filter: blur(0) brightness(1); }
+      25%  { filter: blur(1.5px) brightness(1.8); text-shadow: 0 0 20px rgba(168,85,247,0.95); }
+      65%  { filter: blur(0.6px) brightness(1.4); text-shadow: 0 0 12px rgba(168,85,247,0.6); }
+      100% { filter: blur(0) brightness(1); text-shadow: none; }
+    }
+    .approach-page .work-ignite.is-igniting {
+      animation: work-ignite-k 620ms ease-out forwards;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .approach-page .work-ignite.is-igniting { animation: none; }
+    }
+  </style>
 </head>
 <body class="approach-page">
   <!-- Fixed header -->
@@ -29,7 +43,7 @@
             i design visuals
           </h1>
           <h1 class="hero-line hero-line-bottom">
-            that actually <span class="accent">work</span>
+            that actually <span class="accent work-ignite" data-ignite="work">work</span>
           </h1>
         </div>
 

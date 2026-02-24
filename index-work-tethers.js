@@ -116,9 +116,25 @@
     panelCy = r.top  + r.height * 0.5;
     panelHW = r.width  * 0.5;
     panelHH = r.height * 0.5;
-    // Capture the untilted base transform so we can isolate rotation delta
-    const tf = getComputedStyle(activePanel).transform;
-    M0base = (!tf || tf === 'none') ? new DOMMatrix() : new DOMMatrix(tf);
+    captureM0base(activePanel);
+  }
+
+  // Strip tilt rotation from Mc so M0base encodes only translate+scale.
+  // Mrot = M0base⁻¹ × Mc then isolates pure rotation for anchor projection.
+  function captureM0base(panel) {
+    const tf = getComputedStyle(panel).transform;
+    const Mc = (!tf || tf === 'none') ? new DOMMatrix() : new DOMMatrix(tf);
+    const cs = getComputedStyle(panel);
+    const txDeg = parseFloat(cs.getPropertyValue('--tiltX').trim());
+    const tyDeg = parseFloat(cs.getPropertyValue('--tiltY').trim());
+    if (Number.isFinite(txDeg) && Number.isFinite(tyDeg)) {
+      try {
+        const tiltM = new DOMMatrix(`rotateX(${txDeg}deg) rotateY(${tyDeg}deg)`);
+        M0base = Mc.multiply(tiltM.inverse());
+        return;
+      } catch (_) { /* fallthrough */ }
+    }
+    M0base = Mc;
   }
 
   // ── Anchor update: project corners via rotation-only delta matrix ─────────
@@ -293,8 +309,8 @@
       buildFilaments();
       fadeDir = 1; startTime = performance.now();
       if (!raf) raf = requestAnimationFrame(render);
-      // Re-read rect after is-active transition settles (~120ms), without M0base
-      // so the rotation delta stays correct while easing continues.
+      // Re-read rect after is-active transition settles, then capture new M0base
+      // (translate+scale only, tilt stripped) so Mrot isolates rotation correctly.
       setTimeout(() => {
         if (activePanel !== panel) return;
         const r = panel.getBoundingClientRect();
@@ -302,6 +318,7 @@
         panelCy = r.top  + r.height * 0.5;
         panelHW = r.width  * 0.5;
         panelHH = r.height * 0.5;
+        captureM0base(panel);
         updateAnchors();
       }, 200);
       setTimeout(fireArrivalBursts, 120);
@@ -319,6 +336,19 @@
         fadeDir = -1;
       }
       if (!raf) raf = requestAnimationFrame(render);
+    }, { passive: true });
+
+    // Catch the exact moment the is-active transition ends so we can re-anchor
+    // with the fully-settled geometry and a fresh M0base.
+    panel.addEventListener('transitionend', (e) => {
+      if (activePanel !== panel || e.propertyName !== 'transform') return;
+      const r = panel.getBoundingClientRect();
+      panelCx = r.left + r.width  * 0.5;
+      panelCy = r.top  + r.height * 0.5;
+      panelHW = r.width  * 0.5;
+      panelHH = r.height * 0.5;
+      captureM0base(panel);
+      updateAnchors();
     }, { passive: true });
   });
 })();

@@ -3086,9 +3086,9 @@ body.services-active .services::before {
 
 /* --- Touch: no dim (handled via #workCollageGrid scoped rules below) --- */
 
-/* Task Orbit: slight overscan to eliminate white slivers */
+/* Task Orbit: zoom past baked-in pillar bars in the source video */
 .comic-panel[href="work-02-task-orbit.html"] .comic-panel-video video {
-  transform: scale(1.02);
+  transform: scale(1.18);
   transform-origin: center;
 }
 
