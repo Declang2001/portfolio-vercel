@@ -1773,6 +1773,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let workRect = null, seedFired = false;
     let reduced = false, staticDone = false, isCoarse = false;
     let cometActive = false, cometSX = 0, cometSY = 0, cometT0 = 0;
+    let cometEX = 0, cometEY = 0, cometBolt = [];
     let fragments = [], shockwaves = [];
 
     const rnd = (a, b) => Math.random() * (b - a) + a;
@@ -1793,11 +1794,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const roll = Math.random();
       let type, r;
       if (roll < 0.08)      { type = 'shard'; r = rnd(0.5, 0.9); }
-      else if (roll < 0.14) { type = 'hero';  r = rnd(5.0, 9.0); }
+      else if (roll < 0.11) { type = 'hero';  r = rnd(5.0, 9.0); }
       else                  { type = 'orb';   r = rnd(1.4, 4.5); }
       const spd = reduced ? rnd(CFG.SPD_MIN_R, CFG.SPD_MAX_R) : rnd(CFG.SPD_MIN, CFG.SPD_MAX);
       const life = (rnd(CFG.LIFE_MIN, CFG.LIFE_MAX)) | 0;
-      return { x: px, y: py, spd, ci: (Math.random() * 4) | 0,
+      return { x: px, y: py, lx: px, ly: py, spd, ci: (Math.random() * 4) | 0,
                life, ml: life, type, r: r * dpr, ox: 0, oy: 0, bvx: 0, bvy: 0 };
     }
 
@@ -1840,6 +1841,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateParticles(t) {
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
+        p.lx = p.x; p.ly = p.y;
         const a = fieldAngle(p.x, p.y, t);
         let vx = Math.cos(a) * p.spd + p.bvx;
         let vy = Math.sin(a) * p.spd + p.bvy;
@@ -1873,6 +1875,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderParticles() {
       const ic = CFG.ION, eff = intensity || 1;
+      ctx.lineCap = 'round';
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
         const fade = p.ml > 0 ? p.life / p.ml : 0;
@@ -1880,7 +1883,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (base < 0.01) continue;
 
         let rc = CFG.COLORS[p.ci][0], gc = CFG.COLORS[p.ci][1], bc = CFG.COLORS[p.ci][2];
-        let scale3d = 1, bright = 1, useIstr = false;
+        let scale3d = 1, bright = 1;
 
         if (ptrIntensity > 0.02) {
           const dx = p.x - ptrX, dy = p.y - ptrY;
@@ -1891,21 +1894,38 @@ document.addEventListener('DOMContentLoaded', () => {
             gc = (gc + (ic[1] - gc) * prox) | 0;
             bc = (bc + (ic[2] - bc) * prox) | 0;
             scale3d = 1 + prox * 0.85; bright = 1 + prox * 1.30;
-            useIstr = false;
           }
         }
 
-        const dx2 = p.x + p.ox, dy2 = p.y + p.oy, dr = p.r * scale3d;
-        ctx.fillStyle = useIstr ? ISTR : `rgb(${rc},${gc},${bc})`;
+        const cx2 = p.x + p.ox, cy2 = p.y + p.oy;
+        const lx2 = p.lx + p.ox, ly2 = p.ly + p.oy;
+        const dr = p.r * scale3d;
+        const col = `rgb(${rc},${gc},${bc})`;
 
-        if (p.type === 'shard') {
-          ctx.globalAlpha = Math.min(base * bright, 1);
-          ctx.beginPath(); ctx.arc(dx2, dy2, dr + 0.5, 0, 6.283); ctx.fill();
+        if (p.type === 'hero') {
+          // Small tight plasma glow — not a big soap-bubble halo
+          ctx.globalAlpha = Math.min(base * 0.20 * bright, 1);
+          ctx.fillStyle = col;
+          ctx.beginPath(); ctx.arc(cx2, cy2, dr * 2.2, 0, 6.283); ctx.fill();
+          ctx.globalAlpha = Math.min(base * 0.90 * bright, 1);
+          ctx.fillStyle = `rgb(${Math.min(rc+70,255)},${Math.min(gc+70,255)},${Math.min(bc+70,255)})`;
+          ctx.beginPath(); ctx.arc(cx2, cy2, dr * 0.55, 0, 6.283); ctx.fill();
+        } else if (p.type === 'shard') {
+          // Thin bright streak — crisp ion needle
+          ctx.globalAlpha = Math.min(base * bright * 1.1, 1);
+          ctx.strokeStyle = `rgb(${Math.min(rc+90,255)},${Math.min(gc+90,255)},${Math.min(bc+90,255)})`;
+          ctx.lineWidth = dr * 0.7;
+          ctx.beginPath(); ctx.moveTo(lx2, ly2); ctx.lineTo(cx2, cy2); ctx.stroke();
         } else {
-          ctx.globalAlpha = Math.min(base * 0.17 * bright, 1);
-          ctx.beginPath(); ctx.arc(dx2, dy2, dr * 2.8, 0, 6.283); ctx.fill();
-          ctx.globalAlpha = Math.min(base * 0.78 * bright, 1);
-          ctx.beginPath(); ctx.arc(dx2, dy2, dr, 0, 6.283); ctx.fill();
+          // orb → plasma streak: soft outer glow + bright core
+          ctx.globalAlpha = Math.min(base * bright * 0.32, 1);
+          ctx.strokeStyle = col;
+          ctx.lineWidth = dr * 3.2;
+          ctx.beginPath(); ctx.moveTo(lx2, ly2); ctx.lineTo(cx2, cy2); ctx.stroke();
+          ctx.globalAlpha = Math.min(base * bright * 0.88, 1);
+          ctx.strokeStyle = `rgb(${Math.min(rc+55,255)},${Math.min(gc+55,255)},${Math.min(bc+55,255)})`;
+          ctx.lineWidth = dr * 0.9;
+          ctx.beginPath(); ctx.moveTo(lx2, ly2); ctx.lineTo(cx2, cy2); ctx.stroke();
         }
       }
     }
@@ -1927,29 +1947,77 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // Pre-compute a deterministic zigzag bolt shape when comet fires
+    function fireCometBolt() {
+      cometEX = W / 2; cometEY = H / 2;
+      const ddx = cometEX - cometSX, ddy = cometEY - cometSY;
+      const len = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
+      const nx = -ddy / len, ny = ddx / len; // perpendicular unit
+      let lv = 0xdeadbeef | 0;
+      const lcg = () => { lv = Math.imul(1664525, lv) + 1013904223 | 0; return (lv >>> 0) / 0x100000000; };
+      const SEGS = 9;
+      cometBolt = [];
+      for (let i = 1; i < SEGS; i++) {
+        const rt = i / SEGS;
+        const amp = (lcg() - 0.5) * 2 * 38 * dpr;
+        cometBolt.push({ rt, x: cometSX + ddx * rt + nx * amp, y: cometSY + ddy * rt + ny * amp });
+      }
+    }
+
     function drawComet(now) {
       if (!cometActive) return;
       const t = Math.min((now - cometT0) / CFG.COMET_DUR, 1);
-      const e = 1 - (1 - t) * (1 - t) * (1 - t);
-      const cx = cometSX + (W / 2 - cometSX) * e;
-      const cy = cometSY + (H / 2 - cometSY) * e;
+      const e = 1 - (1 - t) * (1 - t) * (1 - t); // easeOutCubic
+      const hx = cometSX + (cometEX - cometSX) * e;
+      const hy = cometSY + (cometEY - cometSY) * e;
+
+      // Build visible bolt polyline up to current head
+      const bpts = [[cometSX, cometSY]];
+      for (let i = 0; i < cometBolt.length; i++) {
+        if (cometBolt[i].rt > e) break;
+        bpts.push([cometBolt[i].x, cometBolt[i].y]);
+      }
+      bpts.push([hx, hy]);
+
       ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      const eff = intensity || 1;
+
+      // Outer ion glow
+      ctx.globalAlpha = 0.50 * eff;
+      ctx.strokeStyle = ISTR;
+      ctx.lineWidth = 7 * dpr;
+      ctx.shadowColor = ISTR; ctx.shadowBlur = 20 * dpr;
+      ctx.beginPath(); ctx.moveTo(bpts[0][0], bpts[0][1]);
+      for (let i = 1; i < bpts.length; i++) ctx.lineTo(bpts[i][0], bpts[i][1]);
+      ctx.stroke();
+
+      // White core bolt
+      ctx.globalAlpha = 0.95 * eff;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2 * dpr;
+      ctx.shadowColor = '#fff'; ctx.shadowBlur = 6 * dpr;
+      ctx.beginPath(); ctx.moveTo(bpts[0][0], bpts[0][1]);
+      for (let i = 1; i < bpts.length; i++) ctx.lineTo(bpts[i][0], bpts[i][1]);
+      ctx.stroke();
+
+      // Head orb
+      ctx.globalAlpha = 0.90 * eff;
+      ctx.fillStyle = '#fff';
       ctx.shadowColor = ISTR; ctx.shadowBlur = CFG.COMET_GLOW * dpr;
-      ctx.globalAlpha = 0.42 * (intensity || 1);
-      ctx.fillStyle = ISTR;
-      ctx.beginPath(); ctx.arc(cx, cy, CFG.COMET_R * 2.8 * dpr, 0, 6.283); ctx.fill();
-      ctx.globalAlpha = 0.95 * (intensity || 1);
-      ctx.fillStyle = '#fff'; ctx.shadowBlur = CFG.COMET_GLOW * 0.5 * dpr;
-      ctx.beginPath(); ctx.arc(cx, cy, CFG.COMET_R * dpr, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(hx, hy, CFG.COMET_R * dpr, 0, 6.283); ctx.fill();
       ctx.restore();
+
       if (t >= 1) {
         cometActive = false;
-        spawnShockwave(cx, cy, CFG.ION); spawnShockwave(cx, cy, CFG.COLORS[2]);
+        spawnShockwave(hx, hy, CFG.ION); spawnShockwave(hx, hy, CFG.COLORS[2]);
+        const now2 = performance.now();
         for (let i = 0; i < CFG.COMET_FRAGS; i++) {
-          const a = rnd(0, Math.PI * 2), sp = rnd(3.5, 8.5);
-          fragments.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-                           r: rnd(2, 5) * dpr, ci: (Math.random() * 4) | 0,
-                           st: now, life: rnd(CFG.FRAG_LIFE * 0.55, CFG.FRAG_LIFE) });
+          const a = Math.PI * 2 * i / CFG.COMET_FRAGS + rnd(-0.4, 0.4);
+          const sp = rnd(3.5, 8);
+          fragments.push({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                           r: rnd(2, 4.5) * dpr, ci: (i * 3) % 4,
+                           st: now2, life: rnd(CFG.FRAG_LIFE * 0.55, CFG.FRAG_LIFE) });
         }
       }
     }
@@ -1984,6 +2052,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx.globalCompositeOperation = 'lighter';
       renderParticles();
       ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      // Ion lens — unmistakable cursor bloom while hovering
+      if (ptrIntensity > 0.05) {
+        ctx.globalAlpha = ptrIntensity * 0.75;
+        ctx.strokeStyle = ISTR;
+        ctx.lineWidth = 1.5 * dpr;
+        ctx.shadowColor = ISTR; ctx.shadowBlur = 12 * dpr;
+        ctx.beginPath(); ctx.arc(ptrX, ptrY, 14 * dpr, 0, 6.283); ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      }
       drawShockwaves(now);
       if (cometActive) drawComet(now);
       if (fragments.length) drawFragments(now);
@@ -2057,6 +2134,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const sx = ((workRect.left + workRect.width / 2) - canvasRect.left) * dpr;
           const sy = ((workRect.top + workRect.height / 2) - canvasRect.top) * dpr;
           cometSX = sx; cometSY = sy;
+          fireCometBolt();
           cometActive = true; cometT0 = performance.now();
           seedFired = true;
         }
@@ -2326,13 +2404,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// ── Approach collage: tether filaments from .approach-title → hovered panel ──
+// ── Approach collage: tether filaments from headline → hovered panel ──────────
+// v2.1: edge-intersection anchors, sticky on page+rail scroll, robust selector
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.body.classList.contains('approach-page')) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!window.matchMedia('(hover: hover)').matches) return;
 
-  const srcEl  = document.querySelector('.approach-title');
+  // Prefer innermost headline element so filaments originate from the text
+  const srcEl = document.querySelector('.approach-title h2')
+              || document.querySelector('.approach-title .headline')
+              || document.querySelector('.approach-title');
   const panels = document.querySelectorAll('#collageStack .collage-panel');
   if (!srcEl || !panels.length) return;
 
@@ -2340,8 +2422,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const MAIN_N = 3, MICRO_N = 2;
 
   const vv = window.visualViewport;
-  const getVP = () => vv ? { ox: vv.offsetLeft, oy: vv.offsetTop }
-                          : { ox: 0, oy: 0 };
+  const getVP = () => vv ? { ox: vv.offsetLeft, oy: vv.offsetTop } : { ox: 0, oy: 0 };
   const dprCap = () => Math.min(window.devicePixelRatio || 1, 2);
 
   const cvs = document.createElement('canvas');
@@ -2358,31 +2439,60 @@ document.addEventListener('DOMContentLoaded', () => {
     cvs.width = W2; cvs.height = H2;
   }
   resize2();
-  window.addEventListener('resize', resize2, { passive: true });
 
   let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
   let startTime2 = 0, activePanel2 = null;
   let srcPt2 = [0, 0], anchors2 = [], fils2 = [], bursts2 = [];
   const rnd2 = (a, b) => Math.random() * (b - a) + a;
 
-  function getPt(el) {
-    const r = el.getBoundingClientRect(), vp = getVP();
-    return [(r.left + r.width / 2 - vp.ox) * dpr2, (r.top + r.height / 2 - vp.oy) * dpr2];
+  // Source point at 60% down element — hits headline text, not the gap below
+  function getSrcPt() {
+    const r = srcEl.getBoundingClientRect(), vp = getVP();
+    return [(r.left + r.width * 0.5 - vp.ox) * dpr2,
+            (r.top  + r.height * 0.60 - vp.oy) * dpr2];
   }
 
-  function perimPts(rect, n) {
+  // Edge-intersection anchors: strands grab the card face nearest the source
+  function edgeAnchors(srcCX, srcCY, rect, count) {
     const vp = getVP();
     const { left, right, top, bottom, width, height } = rect;
-    const peri = 2 * (width + height), step = peri / n, pts = [];
-    for (let i = 0; i < n; i++) {
-      let d = step * i + step * 0.1 + rnd2(-step * 0.2, step * 0.2);
-      d = ((d % peri) + peri) % peri;
-      let x, y;
-      if (d < width)                   { x = left + d;                          y = top; }
-      else if (d < width + height)     { x = right;                             y = top + (d - width); }
-      else if (d < 2 * width + height) { x = right - (d - width - height);      y = bottom; }
-      else                             { x = left;                              y = bottom - (d - 2 * width - height); }
-      pts.push([(x - vp.ox) * dpr2, (y - vp.oy) * dpr2]);
+    const srcVX = srcCX / dpr2 + vp.ox, srcVY = srcCY / dpr2 + vp.oy;
+    const cardCX = left + width * 0.5, cardCY = top + height * 0.5;
+    const ddx = cardCX - srcVX, ddy = cardCY - srcVY;
+    const dlen = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
+    const ux = ddx / dlen, uy = ddy / dlen;
+    const INSET = 5;
+    const hits = [];
+    const tryEdge = (t, x, y, edge) => {
+      if (t > 0 && x >= left - 1 && x <= right + 1 && y >= top - 1 && y <= bottom + 1)
+        hits.push({ t, x, y, edge });
+    };
+    if (Math.abs(ux) > 1e-4) {
+      tryEdge((left  - srcVX) / ux, left,  srcVY + uy * (left  - srcVX) / ux, 'left');
+      tryEdge((right - srcVX) / ux, right, srcVY + uy * (right - srcVX) / ux, 'right');
+    }
+    if (Math.abs(uy) > 1e-4) {
+      tryEdge((top    - srcVY) / uy, srcVX + ux * (top    - srcVY) / uy, top,    'top');
+      tryEdge((bottom - srcVY) / uy, srcVX + ux * (bottom - srcVY) / uy, bottom, 'bottom');
+    }
+    hits.sort((a, b) => a.t - b.t);
+    const hit = hits[0] || { x: cardCX, y: cardCY, edge: 'bottom' };
+    let bx = hit.x, by = hit.y;
+    if (hit.edge === 'left')   bx += INSET;
+    if (hit.edge === 'right')  bx -= INSET;
+    if (hit.edge === 'top')    by += INSET;
+    if (hit.edge === 'bottom') by -= INSET;
+    const tgX = (hit.edge === 'left' || hit.edge === 'right') ? 0 : 1;
+    const tgY = (hit.edge === 'left' || hit.edge === 'right') ? 1 : 0;
+    const eLen = (hit.edge === 'left' || hit.edge === 'right') ? height : width;
+    const spread = eLen * 0.22;
+    const pts = [];
+    for (let i = 0; i < count; i++) {
+      const off = count > 1 ? (i / (count - 1) - 0.5) * 2 * spread : 0;
+      let ax = bx + tgX * off, ay = by + tgY * off;
+      ax = Math.max(left + INSET, Math.min(right - INSET, ax));
+      ay = Math.max(top + INSET, Math.min(bottom - INSET, ay));
+      pts.push([(ax - vp.ox) * dpr2, (ay - vp.oy) * dpr2]);
     }
     return pts;
   }
@@ -2402,8 +2512,8 @@ document.addEventListener('DOMContentLoaded', () => {
         freq: rnd2(0.5, 1.6), phase: rnd2(0, Math.PI * 2),
         amp:  rnd2(main ? 35 : 12, main ? 80 : 35) * dpr2,
         ampY: rnd2(main ? 20 : 8,  main ? 50 : 20) * dpr2,
-        alpha: main ? rnd2(0.50, 0.75) : rnd2(0.15, 0.30),
-        lw: main ? rnd2(1.0, 1.6) : rnd2(0.5, 0.8), main,
+        alpha: main ? rnd2(0.65, 0.85) : rnd2(0.22, 0.38),
+        lw: main ? rnd2(1.2, 1.8) : rnd2(0.6, 0.9), main,
         spark: main ? { t: rnd2(0, 1), spd: rnd2(0.004, 0.01), dir: 1 } : null,
       });
     }
@@ -2417,15 +2527,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const c = COLORS[f.ci], a = f.alpha * alpha;
     ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
     if (f.main) {
-      ctx2.globalAlpha = a * 0.18; ctx2.lineWidth = f.lw * dpr2 * 4;
+      ctx2.globalAlpha = a * 0.22; ctx2.lineWidth = f.lw * dpr2 * 4;
       ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
     }
-    ctx2.globalAlpha = a * (f.main ? 0.82 : 0.70); ctx2.lineWidth = f.lw * dpr2;
+    ctx2.globalAlpha = a * (f.main ? 0.88 : 0.72); ctx2.lineWidth = f.lw * dpr2;
     ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
     if (f.main) {
       const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3.5 + f.phase);
       const nr = (1.5 + pulse * 1.5) * dpr2;
-      ctx2.globalAlpha = a * (0.6 + pulse * 0.4);
+      ctx2.globalAlpha = a * (0.65 + pulse * 0.35);
       ctx2.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
       ctx2.beginPath(); ctx2.arc(sx, sy, nr, 0, 6.283); ctx2.fill();
       ctx2.beginPath(); ctx2.arc(ax, ay, nr * 0.85, 0, 6.283); ctx2.fill();
@@ -2440,7 +2550,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderApproachTether(now) {
-    ctx2.clearRect(0, 0, W2, H2); ctx2.globalAlpha = 1;
+    ctx2.globalCompositeOperation = 'source-over'; ctx2.globalAlpha = 1;
+    ctx2.clearRect(0, 0, W2, H2);
     fadeAlpha2 = fadeDir2 > 0 ? Math.min(fadeAlpha2 + 0.07, 1)
                : fadeDir2 < 0 ? Math.max(fadeAlpha2 - 0.06, 0)
                : fadeAlpha2;
@@ -2460,14 +2571,37 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx2.beginPath(); ctx2.moveTo(b.x - b.vx * 3, b.y - b.vy * 3); ctx2.lineTo(b.x, b.y); ctx2.stroke();
     }
     if (fadeAlpha2 > 0 || bursts2.length) { raf2 = requestAnimationFrame(renderApproachTether); }
-    else { raf2 = 0; ctx2.clearRect(0, 0, W2, H2); }
+    else { raf2 = 0; ctx2.globalAlpha = 1; ctx2.clearRect(0, 0, W2, H2); }
+  }
+
+  // Recompute positions on scroll/resize while a panel is active
+  function recompute2() {
+    if (!activePanel2) return;
+    srcPt2   = getSrcPt();
+    anchors2 = edgeAnchors(srcPt2[0], srcPt2[1], activePanel2.getBoundingClientRect(), MAIN_N + MICRO_N);
+  }
+  let scrollTick2 = 0;
+  function scheduleRecompute2() {
+    if (scrollTick2 || !activePanel2) return;
+    scrollTick2 = requestAnimationFrame(() => { scrollTick2 = 0; recompute2(); });
+  }
+
+  window.addEventListener('scroll', scheduleRecompute2, { passive: true });
+  window.addEventListener('resize', () => { resize2(); scheduleRecompute2(); }, { passive: true });
+  // Horizontal rail scroll keeps tethers locked to the moving card
+  const collageStack2 = document.getElementById('collageStack');
+  if (collageStack2) collageStack2.addEventListener('scroll', scheduleRecompute2, { passive: true });
+  // iOS visualViewport scroll/resize
+  if (vv) {
+    vv.addEventListener('scroll', scheduleRecompute2, { passive: true });
+    vv.addEventListener('resize', () => { resize2(); scheduleRecompute2(); }, { passive: true });
   }
 
   panels.forEach((panel) => {
     panel.addEventListener('pointerenter', () => {
       activePanel2 = panel;
-      srcPt2   = getPt(srcEl);
-      anchors2 = perimPts(panel.getBoundingClientRect(), MAIN_N + MICRO_N);
+      srcPt2   = getSrcPt();
+      anchors2 = edgeAnchors(srcPt2[0], srcPt2[1], panel.getBoundingClientRect(), MAIN_N + MICRO_N);
       buildFils2(); fadeDir2 = 1; startTime2 = performance.now();
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
       setTimeout(() => {
