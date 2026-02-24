@@ -3038,3 +3038,435 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // CURSOR FX — disabled
+
+// ── Journey page: Portal Run Timeline + Resume Mode ──────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.body.classList.contains('journey-page')) return;
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ── Milestone data ──────────────────────────────────────────────────────────
+  const MILESTONES = [
+    { year: 'Los Angeles', title: 'West Coast Origins',
+      oneLine: 'Grew up surrounded by visual culture, music, and street art in LA.',
+      tags: ['roots', 'visual culture', 'LA'], nx: 0.10, ny: 0.42 },
+    { year: 'Paris', title: 'Art Studies in Paris',
+      oneLine: 'Semester abroad studying fine art and conceptual design at studios in Paris.',
+      tags: ['fine art', 'study abroad', 'concept'], nx: 0.24, ny: 0.63 },
+    { year: 'Oregon', title: 'BS Art & Technology',
+      oneLine: 'University of Oregon — combining fine art, design, and creative computing.',
+      tags: ['degree', 'design', 'tech'], nx: 0.38, ny: 0.30 },
+    { year: '2022', title: 'Amerikid Collective',
+      oneLine: 'Co-founded Amerikid, building brand presence, motion content, and social visuals.',
+      tags: ['brand', 'motion', 'web'], nx: 0.52, ny: 0.58 },
+    { year: '2022', title: 'West Coast Illustrations LLC',
+      oneLine: 'Launched studio practice — illustration, brand identity, and visual systems.',
+      tags: ['studio', 'illustration', 'identity'], nx: 0.66, ny: 0.27 },
+    { year: '2023', title: 'Multimedia Consultant, Nile',
+      oneLine: 'Editorial comics that turned security topics into fast, on-brand stories.',
+      tags: ['consulting', 'editorial', 'comics'], nx: 0.80, ny: 0.60 },
+    { year: 'Now', title: 'Design Technologist',
+      oneLine: 'Building interactive, motion-led web experiences at the intersection of design and code.',
+      tags: ['interactive', 'motion', 'design tech'], nx: 0.92, ny: 0.40 },
+  ];
+
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+  const cvs            = document.getElementById('journeyCanvas');
+  const portalOverlay  = document.getElementById('journeyPortalOverlay');
+  const cardEl         = document.getElementById('journeyCard');
+  const cardYear       = document.getElementById('jCardYear');
+  const cardTitle      = document.getElementById('jCardTitle');
+  const cardLine       = document.getElementById('jCardLine');
+  const cardTags       = document.getElementById('jCardTags');
+  const resumeEl       = document.getElementById('journeyResume');
+  const timelineEl     = document.getElementById('journeyTimeline');
+  const highlightsEl   = document.getElementById('journeyHighlights');
+  const skipBtn        = document.getElementById('jSkip');
+  const jumpBtn        = document.getElementById('jJump');
+  const resumeBtn      = document.getElementById('jResume');
+  const replayBtn      = document.getElementById('jReplay');
+  if (!cvs || !portalOverlay) return;
+
+  const ctx = cvs.getContext('2d');
+  let W = 0, H = 0, dpr = 1;
+  let raf = 0;
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  let isPortalMode    = !reduced;
+  let portalPositions = []; // { vx, vy, x, y } — cached, never read inside loop
+  let stars           = [];
+  let portalEls       = [];
+  let currentIdx      = 0;
+  let travX = 0, travY = 0;
+  let phaseStart      = 0;
+  let phase           = 'pause'; // 'travel' | 'pause'
+  const TRAVEL_MS     = 2400;
+  const PAUSE_MS      = 1600;
+  let autoActive      = false;
+  let done            = false;
+  let cardVisible     = false;
+
+  // ── Build resume timeline ───────────────────────────────────────────────────
+  function buildTimeline() {
+    timelineEl.innerHTML = '';
+    MILESTONES.forEach((m) => {
+      const li = document.createElement('li');
+      li.className = 'journey-timeline-item';
+      li.innerHTML =
+        '<div class="journey-timeline-year">' + m.year + '</div>' +
+        '<div class="journey-timeline-title">' + m.title + '</div>' +
+        '<div class="journey-timeline-desc">' + m.oneLine + '</div>' +
+        '<div class="journey-timeline-tags">' +
+          m.tags.map(function(t) { return '<span class="journey-timeline-tag">' + t + '</span>'; }).join('') +
+        '</div>';
+      timelineEl.appendChild(li);
+    });
+  }
+
+  // ── Portal HTML nodes ───────────────────────────────────────────────────────
+  function buildPortalEls() {
+    portalOverlay.innerHTML = '';
+    portalEls = [];
+    MILESTONES.forEach(function(m, i) {
+      const btn = document.createElement('button');
+      btn.className = 'journey-portal';
+      btn.setAttribute('aria-label', m.year + ': ' + m.title);
+      btn.dataset.idx = String(i);
+      const lbl = document.createElement('span');
+      lbl.className = 'journey-portal-label';
+      lbl.textContent = m.year;
+      lbl.setAttribute('aria-hidden', 'true');
+      btn.appendChild(lbl);
+      btn.addEventListener('click', function() { jumpToPortal(i); });
+      btn.addEventListener('mouseenter', function() { showCard(i); });
+      btn.addEventListener('mouseleave', function() {
+        if (currentIdx !== i || !autoActive) hideCard();
+      });
+      btn.addEventListener('focus', function() { showCard(i); });
+      btn.addEventListener('blur', function() {
+        if (currentIdx !== i) hideCard();
+      });
+      portalOverlay.appendChild(btn);
+      portalEls.push(btn);
+    });
+  }
+
+  function positionPortalEls() {
+    portalEls.forEach(function(el, i) {
+      if (!portalPositions[i]) return;
+      el.style.left = portalPositions[i].vx + 'px';
+      el.style.top  = portalPositions[i].vy + 'px';
+    });
+  }
+
+  // ── Stars (rebuilt on resize, drawn every frame but never per-layout-read) ──
+  function buildStars() {
+    var count = Math.min(Math.floor((W * H) / (dpr * dpr * 2800)), 180);
+    stars = [];
+    for (var i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: (0.35 + Math.random() * 0.75) * dpr,
+        a: 0.1 + Math.random() * 0.35,
+      });
+    }
+  }
+
+  // ── Resize: recompute portal positions (no getBoundingClientRect in loop) ───
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    W = Math.round(vw * dpr);
+    H = Math.round(vh * dpr);
+    cvs.width  = W;
+    cvs.height = H;
+    var headerH = 64;
+    var topPad  = headerH + 72;
+    var botPad  = 72;
+    var usableH = vh - topPad - botPad;
+    portalPositions = MILESTONES.map(function(m) {
+      var vx = Math.round(m.nx * vw);
+      var vy = Math.round(topPad + m.ny * usableH);
+      return { vx: vx, vy: vy, x: Math.round(vx * dpr), y: Math.round(vy * dpr) };
+    });
+    buildStars();
+    if (portalEls.length) positionPortalEls();
+    if (cardVisible && portalPositions[currentIdx]) placeCard(currentIdx);
+  }
+
+  // ── Info card ───────────────────────────────────────────────────────────────
+  function showCard(idx) {
+    var m = MILESTONES[idx];
+    if (!m) return;
+    cardYear.textContent  = m.year;
+    cardTitle.textContent = m.title;
+    cardLine.textContent  = m.oneLine;
+    cardTags.innerHTML    = m.tags.map(function(t) {
+      return '<span class="journey-card-tag">' + t + '</span>';
+    }).join('');
+    placeCard(idx);
+    cardEl.classList.add('is-visible');
+    cardVisible = true;
+  }
+
+  function placeCard(idx) {
+    if (!portalPositions[idx]) return;
+    var vx = portalPositions[idx].vx;
+    var vy = portalPositions[idx].vy;
+    var cw = 278, ch = 145;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var left = vx + 34;
+    var top  = vy - 24;
+    if (left + cw > vw - 12) left = vx - cw - 34;
+    if (top  + ch > vh - 12) top  = vh - ch - 12;
+    if (top  < 80)           top  = 80;
+    left = Math.max(8, left);
+    cardEl.style.left = left + 'px';
+    cardEl.style.top  = top  + 'px';
+  }
+
+  function hideCard() {
+    cardEl.classList.remove('is-visible');
+    cardVisible = false;
+  }
+
+  // ── Mode switching ──────────────────────────────────────────────────────────
+  function showResumeMode() {
+    isPortalMode = false;
+    cancelAnim();
+    portalOverlay.hidden = true;
+    hideCard();
+    resumeEl.hidden      = false;
+    highlightsEl.hidden  = false;
+    if (resumeBtn) resumeBtn.textContent = 'portal run';
+    if (skipBtn)   skipBtn.hidden  = true;
+    if (jumpBtn)   jumpBtn.hidden  = true;
+    if (replayBtn && !reduced) replayBtn.hidden = false;
+  }
+
+  function showPortalMode() {
+    isPortalMode = true;
+    resumeEl.hidden = true;
+    if (!done) highlightsEl.hidden = true;
+    portalOverlay.hidden = false;
+    if (resumeBtn) resumeBtn.textContent = 'resume mode';
+    if (skipBtn)   skipBtn.hidden  = false;
+    if (jumpBtn)   jumpBtn.hidden  = false;
+    if (replayBtn) replayBtn.hidden = true;
+    startAuto();
+  }
+
+  function endAnimation() {
+    done = true;
+    autoActive = false;
+    cancelAnim();
+    portalEls.forEach(function(el) {
+      el.classList.add('is-visited');
+      el.classList.remove('is-active');
+    });
+    hideCard();
+    highlightsEl.hidden = false;
+    if (skipBtn)   skipBtn.hidden  = true;
+    if (jumpBtn)   jumpBtn.hidden  = true;
+    if (replayBtn && !reduced) replayBtn.hidden = false;
+  }
+
+  function cancelAnim() {
+    autoActive = false;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+  }
+
+  function doReplay() {
+    done = false;
+    currentIdx = 0;
+    portalEls.forEach(function(el) {
+      el.classList.remove('is-visited', 'is-active');
+    });
+    hideCard();
+    highlightsEl.hidden  = true;
+    resumeEl.hidden      = true;
+    portalOverlay.hidden = false;
+    isPortalMode         = true;
+    if (resumeBtn) resumeBtn.textContent = 'resume mode';
+    if (skipBtn)   skipBtn.hidden  = false;
+    if (jumpBtn)   jumpBtn.hidden  = false;
+    if (replayBtn) replayBtn.hidden = true;
+    startAuto();
+  }
+
+  // ── Auto sequence ───────────────────────────────────────────────────────────
+  function startAuto() {
+    if (reduced) return;
+    cancelAnim();
+    autoActive  = true;
+    currentIdx  = 0;
+    if (portalPositions[0]) { travX = portalPositions[0].x; travY = portalPositions[0].y; }
+    phaseStart  = performance.now();
+    phase       = 'pause';
+    showCard(0);
+    if (portalEls[0]) portalEls[0].classList.add('is-active');
+    raf = requestAnimationFrame(loop);
+  }
+
+  function jumpToPortal(idx) {
+    if (idx < 0 || idx >= MILESTONES.length) return;
+    autoActive  = true;
+    currentIdx  = idx;
+    portalEls.forEach(function(el, i) {
+      el.classList.toggle('is-visited', i < idx);
+      el.classList.toggle('is-active',  i === idx);
+    });
+    if (portalPositions[idx]) { travX = portalPositions[idx].x; travY = portalPositions[idx].y; }
+    phaseStart = performance.now();
+    phase      = 'pause';
+    showCard(idx);
+    if (!raf) raf = requestAnimationFrame(loop);
+  }
+
+  // ── Animation loop ──────────────────────────────────────────────────────────
+  function easeInOut(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  function loop(now) {
+    // Clear every frame — no trails guarantee
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, W, H);
+
+    if (!isPortalMode) { raf = 0; return; }
+
+    drawStars();
+
+    if (autoActive && portalPositions.length) {
+      var elapsed = now - phaseStart;
+
+      if (phase === 'travel') {
+        var raw = Math.min(elapsed / TRAVEL_MS, 1);
+        var t   = easeInOut(raw);
+        var frm = portalPositions[currentIdx - 1];
+        var to  = portalPositions[currentIdx];
+        if (frm && to) {
+          var cpx = (frm.x + to.x) * 0.5 + (to.y - frm.y) * 0.2;
+          var cpy = (frm.y + to.y) * 0.5 - Math.abs(to.x - frm.x) * 0.12;
+          var mt  = 1 - t;
+          travX = mt * mt * frm.x + 2 * mt * t * cpx + t * t * to.x;
+          travY = mt * mt * frm.y + 2 * mt * t * cpy + t * t * to.y;
+          drawBeam(frm, to, cpx, cpy, t);
+        }
+        if (raw >= 1) {
+          travX = portalPositions[currentIdx].x;
+          travY = portalPositions[currentIdx].y;
+          if (portalEls[currentIdx]) portalEls[currentIdx].classList.add('is-active');
+          showCard(currentIdx);
+          phaseStart = now;
+          phase = 'pause';
+        }
+
+      } else { // pause
+        if (elapsed >= PAUSE_MS) {
+          if (portalEls[currentIdx]) {
+            portalEls[currentIdx].classList.remove('is-active');
+            portalEls[currentIdx].classList.add('is-visited');
+          }
+          currentIdx++;
+          if (currentIdx >= MILESTONES.length) {
+            drawTraveler();
+            endAnimation();
+            raf = 0;
+            return;
+          }
+          hideCard();
+          phaseStart = now;
+          phase = 'travel';
+        }
+      }
+    }
+
+    drawTraveler();
+    raf = requestAnimationFrame(loop);
+  }
+
+  // ── Canvas drawing helpers ──────────────────────────────────────────────────
+  function drawStars() {
+    ctx.fillStyle = '#fff';
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      ctx.globalAlpha = s.a;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, 6.283);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTraveler() {
+    if (!travX && !travY) return;
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = 'rgb(168,85,247)';
+    ctx.beginPath(); ctx.arc(travX, travY, 20 * dpr, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = 'rgb(200,140,255)';
+    ctx.beginPath(); ctx.arc(travX, travY, 7 * dpr, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(travX, travY, 2.5 * dpr, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBeam(frm, to, cpx, cpy, t) {
+    if (t <= 0.02) return;
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.strokeStyle = 'rgb(168,85,247)';
+    ctx.lineWidth   = 1.2 * dpr;
+    ctx.lineCap     = 'round';
+    ctx.beginPath();
+    ctx.moveTo(frm.x, frm.y);
+    var steps = 18;
+    for (var s = 1; s <= steps; s++) {
+      var st = (s / steps) * t;
+      var mt = 1 - st;
+      ctx.lineTo(
+        mt * mt * frm.x + 2 * mt * st * cpx + st * st * to.x,
+        mt * mt * frm.y + 2 * mt * st * cpy + st * st * to.y
+      );
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Controls ────────────────────────────────────────────────────────────────
+  if (skipBtn)   skipBtn.addEventListener('click',   endAnimation);
+  if (jumpBtn)   jumpBtn.addEventListener('click',   function() {
+    endAnimation();
+    highlightsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  if (resumeBtn) resumeBtn.addEventListener('click', function() {
+    if (isPortalMode) showResumeMode(); else showPortalMode();
+  });
+  if (replayBtn) replayBtn.addEventListener('click', doReplay);
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+  buildTimeline();
+  buildPortalEls();
+  resize();
+
+  if (reduced) {
+    cvs.hidden           = true;
+    portalOverlay.hidden = true;
+    resumeEl.hidden      = false;
+    highlightsEl.hidden  = false;
+    isPortalMode         = false;
+    if (skipBtn)   skipBtn.hidden   = true;
+    if (jumpBtn)   jumpBtn.hidden   = true;
+    if (resumeBtn) resumeBtn.textContent = 'portal run';
+  } else {
+    portalOverlay.hidden = false;
+    startAuto();
+  }
+
+  window.addEventListener('resize', function() { resize(); }, { passive: true });
+});
