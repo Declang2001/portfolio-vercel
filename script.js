@@ -3141,12 +3141,19 @@ document.addEventListener('DOMContentLoaded', () => {
   let raf = 0, lastT = 0, elapsed = 0;
   let isTunnelMode = !reduced, done = false;
 
-  const FOV = 500, NEAR = 14, FAR = 1800, SPEED = 65, END_Z = 1300, CARD_DUR = 3400;
+  const FOV = 500, NEAR = 14, FAR = 1800, SPEED = 65, END_Z = 1300;
+  // Milestone phase durations (ms)
+  const FLY_FIRST = 2200, FLY_REST = 1900;
+  const HOLD_FIRST = 1400, HOLD_REST = 1100;
+  const FADE_MS = 500;
+  const META_REVEAL = 350, LINE_REVEAL = 550, TAGS_REVEAL = 750;
+  const REVEAL_RAMP = 180; // fade-in ramp for each staged element
   let R_TUNNEL = 300, NUM_DUST = 180;
 
   let cameraZ = 0, rings = [], streaks = [], dust = [], pulseRings = [], msDone = [];
-  let cardTimer = 0, cardSlowEnd = 0, boostEnd = 0, boostMul = 1, bloomStart = 0;
+  let boostEnd = 0, boostMul = 1, bloomStart = 0;
   let noiseCvs = null, noisePat = null;
+  let milestoneFX = null;
 
   const NUM_RINGS = 28, NUM_STREAKS = 55;
 
@@ -3192,7 +3199,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function initTunnel() {
     cameraZ = 0; elapsed = 0; lastT = 0;
     msDone = MILESTONES.map(function() { return false; });
-    cardTimer = 0; cardSlowEnd = 0; boostEnd = 0; boostMul = 1; bloomStart = 0;
+    boostEnd = 0; boostMul = 1; bloomStart = 0; milestoneFX = null;
     rings = []; streaks = []; dust = []; pulseRings = [];
     var i;
     for (i = 0; i < NUM_RINGS;   i++) rings.push(makeRing(NEAR + (i/NUM_RINGS)*(FAR-NEAR)));
@@ -3225,26 +3232,300 @@ document.addEventListener('DOMContentLoaded', () => {
     cvs.width = W; cvs.height = H;
   }
 
-  function showCard(m) {
-    cardYear.textContent  = m.year;
-    cardTitle.textContent = m.title;
-    cardLine.textContent  = m.oneLine;
-    cardTags.innerHTML = m.tags.map(function(t){
-      return '<span class="journey-card-tag">'+t+'</span>';}).join('');
-    var cw = cardEl.offsetWidth  || 400;
-    var ch = cardEl.offsetHeight || 160;
-    var vw = W/dpr, vh = H/dpr;
-    cardEl.style.left = Math.round((vw - cw)*0.5)+'px';
-    cardEl.style.top  = Math.round(vh*0.40 - ch*0.5)+'px';
-    cardEl.classList.add('is-visible');
+  // ── Milestone FX: offscreen pre-render + cheap per-frame drawImage ──
+
+  // ── Word-wrap helper: returns array of lines that fit within maxW ──
+  function wrapTextLines(ctxRef, text, maxW, maxLines) {
+    var words = text.split(' ');
+    var lines = [], cur = words[0] || '';
+    for (var i = 1; i < words.length; i++) {
+      var test = cur + ' ' + words[i];
+      if (ctxRef.measureText(test).width > maxW) {
+        lines.push(cur);
+        cur = words[i];
+        if (maxLines && lines.length >= maxLines) { cur = ''; break; }
+      } else { cur = test; }
+    }
+    if (cur) lines.push(cur);
+    return lines;
   }
-  function hideCard() { cardEl.classList.remove('is-visible'); cardTimer = 0; }
+
+  function startMilestoneFX(m, now, idx) {
+    var isFirst = (idx === 0);
+    var flyMs  = isFirst ? FLY_FIRST : FLY_REST;
+    var holdMs = isFirst ? HOLD_FIRST : HOLD_REST;
+    milestoneFX = {
+      active: true, start: now,
+      flyMs: flyMs, holdMs: holdMs, fadeMs: FADE_MS,
+      dur: flyMs + holdMs + FADE_MS,
+      titleBmp: null, metaBmp: null, lineBmp: null, tagsBmp: null,
+      bmpW: 0, totalH: 0,
+      titleH: 0, metaH: 0, lineH: 0, tagsH: 0,
+      sp1: 0, sp2: 0, sp3: 0
+    };
+    prerenderMilestoneLayers(m, milestoneFX);
+  }
+
+  function prerenderMilestoneLayers(m, fx) {
+    var vw = W / dpr;
+    var titlePx = Math.max(36, Math.min(vw * 0.075, 88));
+    var metaPx  = Math.round(titlePx * 0.40);
+    var linePx  = Math.round(titlePx * 0.36);
+    var tagPx   = Math.round(titlePx * 0.26);
+    var pillH   = Math.round(tagPx * 1.8);
+    var fontStack = 'system-ui, -apple-system, sans-serif';
+    var maxTextW = Math.min(vw * 0.85, 700) * dpr;
+
+    fx.sp1 = Math.round(titlePx * 0.70 * dpr);
+    fx.sp2 = Math.round(titlePx * 0.50 * dpr);
+    fx.sp3 = Math.round(titlePx * 0.55 * dpr);
+
+    var si, st, sox, soy, sa;
+
+    // ── 1) Title layer (3D extruded, word-wrapped up to 2 lines) ──
+    var tSz = Math.round(titlePx * dpr);
+    var measure = document.createElement('canvas').getContext('2d');
+    measure.font = 'bold ' + tSz + 'px ' + fontStack;
+    var titleLines = wrapTextLines(measure, m.title, maxTextW, 2);
+    // Auto-shrink if still too wide on a single line
+    var tSzActual = tSz;
+    if (titleLines.length === 1 && measure.measureText(titleLines[0]).width > maxTextW) {
+      tSzActual = Math.round(tSz * maxTextW / measure.measureText(titleLines[0]).width);
+      measure.font = 'bold ' + tSzActual + 'px ' + fontStack;
+    }
+    var tLineH = Math.round(tSzActual * 1.20);
+    var tBlockH = tLineH * titleLines.length;
+    var extDepth = tSzActual * 0.09;
+    // Width: measure widest line + extrusion offset + margin
+    var tMaxLW = 0;
+    for (si = 0; si < titleLines.length; si++) {
+      var lw = measure.measureText(titleLines[si]).width;
+      if (lw > tMaxLW) tMaxLW = lw;
+    }
+    var tBmpW = Math.round(tMaxLW + extDepth * 2 + tSzActual * 0.3);
+    var tBmpH = Math.round(tBlockH + extDepth + tSzActual * 0.15);
+    var tOc = document.createElement('canvas');
+    tOc.width = tBmpW; tOc.height = tBmpH;
+    var tc = tOc.getContext('2d');
+    tc.textAlign = 'center'; tc.textBaseline = 'middle';
+    tc.font = 'bold ' + tSzActual + 'px ' + fontStack;
+    var tCx = tBmpW * 0.5;
+    var extSteps = 16;
+    for (var li = 0; li < titleLines.length; li++) {
+      var lineY = tLineH * 0.5 + li * tLineH;
+      // Extrusion slices
+      for (si = extSteps; si >= 1; si--) {
+        st = si / extSteps;
+        sox = st * extDepth * 0.65;
+        soy = st * extDepth;
+        var sR = Math.round(75 + 45 * (1 - st));
+        var sG = Math.round(25 + 30 * (1 - st));
+        var sB = Math.round(140 + 55 * (1 - st));
+        sa = 0.14 + 0.12 * (1 - st);
+        tc.globalAlpha = sa;
+        tc.fillStyle = 'rgb(' + sR + ',' + sG + ',' + sB + ')';
+        tc.fillText(titleLines[li], tCx + sox, lineY + soy);
+      }
+      // Face
+      tc.globalAlpha = 1;
+      tc.fillStyle = '#fff';
+      tc.fillText(titleLines[li], tCx, lineY);
+      // Rim stroke
+      tc.globalAlpha = 0.50;
+      tc.strokeStyle = 'rgba(168,85,247,1)';
+      tc.lineWidth = Math.max(0.6, tSzActual * 0.014);
+      tc.strokeText(titleLines[li], tCx, lineY);
+      // Specular
+      tc.globalAlpha = 0.10;
+      tc.fillStyle = 'rgba(230,215,255,1)';
+      tc.fillText(titleLines[li], tCx, lineY - tSzActual * 0.018);
+    }
+    tc.globalAlpha = 1;
+    fx.titleBmp = tOc; fx.titleH = tBmpH;
+
+    // ── 2) Meta layer (year/location) ──
+    var mSz = Math.round(metaPx * dpr);
+    var mOc = document.createElement('canvas');
+    var mMeasure = document.createElement('canvas').getContext('2d');
+    mMeasure.font = '600 ' + mSz + 'px ' + fontStack;
+    var mTW = Math.round(mMeasure.measureText(m.year).width + mSz * 0.6);
+    var mBmpH = Math.round(mSz * 1.5);
+    mOc.width = mTW; mOc.height = mBmpH;
+    var mc = mOc.getContext('2d');
+    mc.textAlign = 'center'; mc.textBaseline = 'middle';
+    mc.font = '600 ' + mSz + 'px ' + fontStack;
+    mc.globalAlpha = 0.92;
+    mc.fillStyle = 'rgba(185,120,255,1)';
+    mc.fillText(m.year, mTW * 0.5, mBmpH * 0.5);
+    fx.metaBmp = mOc; fx.metaH = mBmpH;
+
+    // ── 3) OneLine layer (word-wrapped, up to 4 lines, no truncation) ──
+    var lSz = Math.round(linePx * dpr);
+    var lMeasure = document.createElement('canvas').getContext('2d');
+    lMeasure.font = '400 ' + lSz + 'px ' + fontStack;
+    var oneLines = wrapTextLines(lMeasure, m.oneLine, maxTextW, 4);
+    var lLineH = Math.round(lSz * 1.55);
+    var lBlockH = lLineH * oneLines.length;
+    var lMaxLW = 0;
+    for (si = 0; si < oneLines.length; si++) {
+      var olw = lMeasure.measureText(oneLines[si]).width;
+      if (olw > lMaxLW) lMaxLW = olw;
+    }
+    var lBmpW = Math.round(lMaxLW + lSz * 0.6);
+    var lBmpH = Math.round(lBlockH + lSz * 0.2);
+    var lOc = document.createElement('canvas');
+    lOc.width = lBmpW; lOc.height = lBmpH;
+    var lc = lOc.getContext('2d');
+    lc.textAlign = 'center'; lc.textBaseline = 'middle';
+    lc.font = '400 ' + lSz + 'px ' + fontStack;
+    lc.globalAlpha = 0.78;
+    lc.fillStyle = 'rgba(225,215,240,1)';
+    for (si = 0; si < oneLines.length; si++) {
+      lc.fillText(oneLines[si], lBmpW * 0.5, lLineH * 0.5 + si * lLineH);
+    }
+    fx.lineBmp = lOc; fx.lineH = lBmpH;
+
+    // ── 4) Tags layer (pills) ──
+    var tags = m.tags || [];
+    if (tags.length) {
+      var tgSz = Math.round(tagPx * dpr);
+      var pH   = Math.round(pillH * dpr);
+      var tgMeasure = document.createElement('canvas').getContext('2d');
+      tgMeasure.font = '500 ' + tgSz + 'px ' + fontStack;
+      var show = tags.length > 3 ? tags.slice(0, 3) : tags;
+      var extra = tags.length > 3 ? '+' + (tags.length - 3) : '';
+      if (extra) show = show.concat([extra]);
+      var tPadX = tgSz * 0.7, tGap = tgSz * 0.45;
+      var tWidths = [], tTotalW = 0;
+      for (si = 0; si < show.length; si++) {
+        var tw = tgMeasure.measureText(show[si]).width + tPadX * 2;
+        tWidths.push(tw); tTotalW += tw;
+      }
+      tTotalW += (show.length - 1) * tGap;
+      var tgBmpW = Math.round(tTotalW + tgSz);
+      var tgBmpH = Math.round(pH + tgSz * 0.4);
+      var tgOc = document.createElement('canvas');
+      tgOc.width = tgBmpW; tgOc.height = tgBmpH;
+      var tgc = tgOc.getContext('2d');
+      tgc.textAlign = 'center'; tgc.textBaseline = 'middle';
+      tgc.font = '500 ' + tgSz + 'px ' + fontStack;
+      var tStartX = (tgBmpW - tTotalW) * 0.5;
+      var tR = pH * 0.5;
+      var tgCy = tgBmpH * 0.5;
+      for (si = 0; si < show.length; si++) {
+        var tpx = tStartX + tWidths[si] * 0.5;
+        tgc.globalAlpha = 0.18;
+        tgc.fillStyle = 'rgba(168,85,247,1)';
+        tgc.beginPath();
+        tgc.roundRect(tpx - tWidths[si] * 0.5, tgCy - pH * 0.5, tWidths[si], pH, tR);
+        tgc.fill();
+        tgc.globalAlpha = 0.42;
+        tgc.strokeStyle = 'rgba(168,85,247,1)';
+        tgc.lineWidth = 1;
+        tgc.beginPath();
+        tgc.roundRect(tpx - tWidths[si] * 0.5, tgCy - pH * 0.5, tWidths[si], pH, tR);
+        tgc.stroke();
+        tgc.globalAlpha = 0.82;
+        tgc.fillStyle = 'rgba(200,160,255,1)';
+        tgc.fillText(show[si], tpx, tgCy);
+        tStartX += tWidths[si] + tGap;
+      }
+      fx.tagsBmp = tgOc; fx.tagsH = tgBmpH;
+    }
+
+    // Composite width = widest layer
+    fx.bmpW = Math.max(tBmpW, mTW, lBmpW, fx.tagsBmp ? fx.tagsBmp.width : 0);
+    fx.totalH = fx.titleH + fx.sp1 + fx.metaH + fx.sp2 + fx.lineH + fx.sp3 + (fx.tagsH || 0);
+  }
+
+  function drawMilestoneFX(now) {
+    if (!milestoneFX || !milestoneFX.active) return;
+    var fx = milestoneFX;
+    if (!fx.titleBmp) return;
+    var t = now - fx.start; // elapsed ms
+    if (t >= fx.dur) { milestoneFX = null; return; }
+
+    // ── Scale: fly-in over flyMs, then hold at 1.0 ──
+    var flyP = Math.min(t / fx.flyMs, 1);
+    flyP = 1 - Math.pow(2, -10 * flyP); // easeOutExpo
+    var depth = 1.0 - flyP;
+    var s = 0.28 + 0.72 * flyP;
+
+    // Fit scale cap: never wider than 92% of viewport
+    var fitScale = (W * 0.92) / fx.bmpW;
+    if (s > fitScale) s = fitScale;
+
+    // ── Alpha envelope ──
+    var alphaIn = Math.min(t / 300, 1); // quick 300ms fade-in
+    var fadeStart = fx.flyMs + fx.holdMs;
+    var alphaOut = t > fadeStart ? 1 - (t - fadeStart) / fx.fadeMs : 1;
+    if (alphaOut < 0) alphaOut = 0;
+    var fog = 0.25 + 0.75 * flyP;
+    var baseAlpha = alphaIn * alphaOut * fog;
+
+    // ── Staged alpha per layer (keyed off ms, not %) ──
+    var titleA = baseAlpha;
+    var metaA  = baseAlpha * Math.min(Math.max((t - META_REVEAL) / REVEAL_RAMP, 0), 1);
+    var lineA  = baseAlpha * Math.min(Math.max((t - LINE_REVEAL) / REVEAL_RAMP, 0), 1);
+    var tagsA  = baseAlpha * Math.min(Math.max((t - TAGS_REVEAL) / REVEAL_RAMP, 0), 1);
+
+    // Vertical drift (only during fly-in)
+    var yDrift = depth * 40 * dpr;
+
+    // Composite block: center on screen, stack layers with spacing
+    var totalH = fx.totalH * s;
+    var blockTop = cy - totalH * 0.42 + yDrift;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Perspective skew during fly-in
+    var skewX = 0.03 * depth;
+    ctx.translate(cx, cy);
+    ctx.transform(1, 0, skewX, 1, 0, 0);
+    ctx.translate(-cx, -cy);
+
+    var curY = blockTop;
+
+    // Title
+    var tw = fx.titleBmp.width * s, th = fx.titleH * s;
+    ctx.globalAlpha = titleA;
+    ctx.drawImage(fx.titleBmp, cx - tw * 0.5, curY, tw, th);
+    curY += th + fx.sp1 * s;
+
+    // Meta
+    if (metaA > 0.005) {
+      var mw = fx.metaBmp.width * s, mh = fx.metaH * s;
+      ctx.globalAlpha = metaA;
+      ctx.drawImage(fx.metaBmp, cx - mw * 0.5, curY, mw, mh);
+    }
+    curY += fx.metaH * s + fx.sp2 * s;
+
+    // OneLine
+    if (lineA > 0.005) {
+      var lw = fx.lineBmp.width * s, lh = fx.lineH * s;
+      ctx.globalAlpha = lineA;
+      ctx.drawImage(fx.lineBmp, cx - lw * 0.5, curY, lw, lh);
+    }
+    curY += fx.lineH * s + fx.sp3 * s;
+
+    // Tags
+    if (tagsA > 0.005 && fx.tagsBmp) {
+      var tgw = fx.tagsBmp.width * s, tgh = fx.tagsH * s;
+      ctx.globalAlpha = tagsA;
+      ctx.drawImage(fx.tagsBmp, cx - tgw * 0.5, curY, tgw, tgh);
+    }
+
+    ctx.restore();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
 
   function showResumeMode() {
     isTunnelMode = false; cancelAnim();
     cvs.style.transition = 'opacity 0.25s ease'; cvs.style.opacity = '0';
     setTimeout(function(){ cvs.hidden = true; }, 300);
-    hideCard();
+    milestoneFX = null;
     resumeEl.hidden = false; highlightsEl.hidden = false;
     var scrollTarget = (resumeEl.offsetTop||0) - 80;
     window.scrollTo(0, Math.max(0, scrollTarget));
@@ -3257,7 +3538,7 @@ document.addEventListener('DOMContentLoaded', () => {
     isTunnelMode = true;
     resumeEl.hidden = true; highlightsEl.hidden = true;
     cvs.hidden = false; cvs.style.transition = ''; cvs.style.opacity = '1';
-    hideCard(); done = false;
+    milestoneFX = null; done = false;
     if (resumeBtn)      { resumeBtn.textContent = 'resume mode'; resumeBtn.hidden = false; }
     if (skipBtn)        skipBtn.hidden = false;
     if (navWorkBtn)     navWorkBtn.hidden = true;
@@ -3422,12 +3703,15 @@ document.addEventListener('DOMContentLoaded', () => {
     lastT = now; elapsed += dt;
 
     boostMul = (now < boostEnd) ? 1.6 : 1;
-    var cardSlowMul = 1;
-    if (now < cardSlowEnd) {
-      var tSlow = 1 - (cardSlowEnd - now)/800;
-      cardSlowMul = 0.45 + 0.55*Math.max(0, Math.min(1, tSlow));
+    var msFXMul = 1;
+    if (milestoneFX && milestoneFX.active) {
+      var mT = now - milestoneFX.start;
+      var visEnd = milestoneFX.flyMs + milestoneFX.holdMs; // fly + hold
+      // Slow to 0.35× during visible period, ease back during fade
+      if (mT < visEnd) { msFXMul = 0.35; }
+      else { msFXMul = 0.35 + 0.65 * Math.min((mT - visEnd) / milestoneFX.fadeMs, 1); }
     }
-    var spd = SPEED * boostMul * cardSlowMul;
+    var spd = SPEED * boostMul * msFXMul;
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
@@ -3484,13 +3768,11 @@ document.addEventListener('DOMContentLoaded', () => {
     for (m = 0; m < MILESTONES.length; m++) {
       if (!msDone[m] && cameraZ >= MILESTONES[m].triggerZ) {
         msDone[m]   = true;
-        cardTimer   = now + CARD_DUR;
-        cardSlowEnd = now + 800;
-        showCard(MILESTONES[m]);
+        startMilestoneFX(MILESTONES[m], now, m);
         triggerPulse(now);
       }
     }
-    if (cardTimer && now > cardTimer) hideCard();
+    drawMilestoneFX(now);
     if (cameraZ >= END_Z) { endAnimation(); return; }
     raf = requestAnimationFrame(loop);
   }
