@@ -1,5 +1,5 @@
-// ── Tethers v2.1: sticky edge-anchored filaments on work card hover ──────────
-// Index page only. Edge-intersection anchors, scroll-stable, reduced-motion aware.
+// ── Tethers v3: side-midpoint anchors, center strike, scroll-stable ──────────
+// Index page only. Reduced-motion and coarse-pointer aware.
 (() => {
   'use strict';
 
@@ -40,7 +40,7 @@
   let W = 0, H = 0, dpr = 1;
   let raf = 0, activePanel = null;
   let fadeAlpha = 0, fadeDir = 0, startTime = 0;
-  let srcCenter = [0, 0], anchors = [], filaments = [], bursts = [];
+  let srcCenter = [0, 0], anchors = [], filaments = [], bursts = [], strikeCenter = [0, 0];
 
   const rnd = (a, b) => Math.random() * (b - a) + a;
 
@@ -59,7 +59,7 @@
             (r.top  + r.height * 0.60 - vp.oy) * dpr];
   }
 
-  // ── Tether target: union rect of all child media (fixes multi-tile panels) ─
+  // ── Tether target: union rect of all child media ──────────────────────────
   function getTetherRect(panel) {
     const media = [...panel.querySelectorAll('video, img')];
     if (media.length === 0) return panel.getBoundingClientRect();
@@ -78,18 +78,18 @@
              width: maxR - minL, height: maxB - minT };
   }
 
-  // ── Corner anchors: TL/TR/BR/BL with clamped inset ───────────────────────
-  function cornerAnchors(rect) {
+  // ── Side midpoint anchors: top / right / bottom / left ───────────────────
+  function sideAnchors(rect) {
     const vp = getVP();
-    const iw = Math.min(4, rect.width  * 0.10);
-    const ih = Math.min(4, rect.height * 0.10);
-    const l = rect.left  + iw, r = rect.right  - iw;
-    const t = rect.top   + ih, b = rect.bottom - ih;
+    const iw = Math.min(3, rect.width  * 0.10);
+    const ih = Math.min(3, rect.height * 0.10);
+    const mX = rect.left + rect.width  * 0.5;
+    const mY = rect.top  + rect.height * 0.5;
     return [
-      [(l - vp.ox) * dpr, (t - vp.oy) * dpr], // TL
-      [(r - vp.ox) * dpr, (t - vp.oy) * dpr], // TR
-      [(r - vp.ox) * dpr, (b - vp.oy) * dpr], // BR
-      [(l - vp.ox) * dpr, (b - vp.oy) * dpr], // BL
+      [(mX              - vp.ox) * dpr, (rect.top    + ih - vp.oy) * dpr], // top mid
+      [(rect.right - iw - vp.ox) * dpr, (mY               - vp.oy) * dpr], // right mid
+      [(mX              - vp.ox) * dpr, (rect.bottom - ih - vp.oy) * dpr], // bottom mid
+      [(rect.left  + iw - vp.ox) * dpr, (mY               - vp.oy) * dpr], // left mid
     ];
   }
 
@@ -97,7 +97,11 @@
   function recomputeRects() {
     if (!activePanel) return;
     srcCenter = computeSrcCenter();
-    anchors   = cornerAnchors(getTetherRect(activePanel));
+    const r = getTetherRect(activePanel);
+    anchors = sideAnchors(r);
+    const vp = getVP();
+    strikeCenter = [(r.left + r.width  * 0.5 - vp.ox) * dpr,
+                    (r.top  + r.height * 0.5 - vp.oy) * dpr];
   }
   let scrollTick = 0;
   const scheduleRecompute = () => {
@@ -136,17 +140,31 @@
         spark: isMain ? { t: rnd(0, 1), spd: rnd(0.004, 0.010), dir: 1 } : null,
       });
     }
+    // Center strike filament — fast spark, fades to ambient after ~0.5s
+    filaments.push({
+      ci: 0, freq: rnd(0.3, 0.6), phase: rnd(0, Math.PI * 2),
+      amp: 18 * dpr, ampY: 12 * dpr,
+      alpha: 0.90, lw: 1.5,
+      main: true, strike: true,
+      spark: { t: 0, spd: 0.030, dir: 1 },
+    });
   }
 
   // ── Render one filament ──────────────────────────────────────────────────
   function drawFilament(f, elapsed, alpha) {
-    if (!anchors[f.ai]) return;
-    const [ax, ay] = anchors[f.ai];
+    let ax, ay;
+    if (f.strike) {
+      [ax, ay] = strikeCenter;
+    } else {
+      if (!anchors[f.ai]) return;
+      [ax, ay] = anchors[f.ai];
+    }
     const [sx, sy] = srcCenter;
     const mx = (sx + ax) / 2 + Math.sin(elapsed * f.freq + f.phase) * f.amp;
     const my = (sy + ay) / 2 + Math.cos(elapsed * f.freq * 0.7 + f.phase) * f.ampY;
     const c = COLORS[f.ci];
-    const a = f.alpha * alpha;
+    const strikeMulti = f.strike ? Math.max(0.35, 1.0 - elapsed * 1.8) : 1;
+    const a = f.alpha * alpha * strikeMulti;
     ctx.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
     if (f.main) {
       ctx.globalAlpha = a * 0.22; ctx.lineWidth = f.lw * dpr * 4;
@@ -174,26 +192,6 @@
     }
   }
 
-  // ── Perimeter wrap: subtle edge strands that grip the card ───────────────
-  function drawWrapEdges(elapsed, alpha) {
-    if (anchors.length < 4) return;
-    const edges = [[anchors[0], anchors[1]], [anchors[1], anchors[2]],
-                   [anchors[2], anchors[3]], [anchors[3], anchors[0]]];
-    ctx.lineCap = 'round';
-    edges.forEach(([p0, p1], i) => {
-      const cx = (p0[0] + p1[0]) / 2 + Math.sin(elapsed * 0.8 + i * 1.5) * 5 * dpr;
-      const cy = (p0[1] + p1[1]) / 2 + Math.cos(elapsed * 0.6 + i * 1.2) * 5 * dpr;
-      const c  = COLORS[i % COLORS.length];
-      ctx.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-      ctx.globalAlpha = alpha * 0.13;
-      ctx.lineWidth   = 2.5 * dpr;
-      ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.quadraticCurveTo(cx, cy, p1[0], p1[1]); ctx.stroke();
-      ctx.globalAlpha = alpha * 0.22;
-      ctx.lineWidth   = 0.7 * dpr;
-      ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.quadraticCurveTo(cx, cy, p1[0], p1[1]); ctx.stroke();
-    });
-  }
-
   // ── Contact bursts ────────────────────────────────────────────────────────
   function spawnBurst(bx, by, now) {
     for (let j = 0; j < 5; j++) {
@@ -216,7 +214,6 @@
     if (fadeAlpha > 0 && anchors.length > 0) {
       ctx.save();
       for (let i = 0; i < filaments.length; i++) drawFilament(filaments[i], elapsed, fadeAlpha);
-      drawWrapEdges(elapsed, fadeAlpha);
       ctx.restore();
     }
     for (let i = bursts.length - 1; i >= 0; i--) {
@@ -245,7 +242,11 @@
     panel.addEventListener('pointerenter', () => {
       activePanel = panel;
       srcCenter = computeSrcCenter();
-      anchors   = cornerAnchors(getTetherRect(panel));
+      const r = getTetherRect(panel);
+      anchors = sideAnchors(r);
+      const vp = getVP();
+      strikeCenter = [(r.left + r.width  * 0.5 - vp.ox) * dpr,
+                      (r.top  + r.height * 0.5 - vp.oy) * dpr];
       buildFilaments();
       fadeDir = 1; startTime = performance.now();
       if (!raf) raf = requestAnimationFrame(render);

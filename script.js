@@ -2450,7 +2450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
   let startTime2 = 0, activePanel2 = null;
-  let srcPt2 = [0, 0], anchors2 = [], fils2 = [], bursts2 = [];
+  let srcPt2 = [0, 0], anchors2 = [], fils2 = [], bursts2 = [], strikeCenter2 = [0, 0];
   const rnd2 = (a, b) => Math.random() * (b - a) + a;
 
   // Source point at 60% down element — hits headline text, not the gap below
@@ -2460,37 +2460,18 @@ document.addEventListener('DOMContentLoaded', () => {
             (r.top  + r.height * 0.60 - vp.oy) * dpr2];
   }
 
-  // Tether target: union rect of all child media (fixes multi-tile approach panels)
-  function getTetherRect2(panel) {
-    const media = [...panel.querySelectorAll('video, img')];
-    if (media.length === 0) return panel.getBoundingClientRect();
-    if (media.length === 1) return media[0].getBoundingClientRect();
-    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
-    for (const m of media) {
-      const r = m.getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) continue;
-      if (r.left   < minL) minL = r.left;
-      if (r.top    < minT) minT = r.top;
-      if (r.right  > maxR) maxR = r.right;
-      if (r.bottom > maxB) maxB = r.bottom;
-    }
-    if (!isFinite(minL)) return panel.getBoundingClientRect();
-    return { left: minL, top: minT, right: maxR, bottom: maxB,
-             width: maxR - minL, height: maxB - minT };
-  }
-
-  // Corner anchors: TL/TR/BR/BL with clamped inset
-  function cornerAnchors2(rect) {
+  // Side midpoint anchors on outer panel: top / right / bottom / left
+  function sideAnchors2(rect) {
     const vp = getVP();
-    const iw = Math.min(4, rect.width  * 0.10);
-    const ih = Math.min(4, rect.height * 0.10);
-    const l = rect.left  + iw, r = rect.right  - iw;
-    const t = rect.top   + ih, b = rect.bottom - ih;
+    const iw = Math.min(3, rect.width  * 0.10);
+    const ih = Math.min(3, rect.height * 0.10);
+    const mX = rect.left + rect.width  * 0.5;
+    const mY = rect.top  + rect.height * 0.5;
     return [
-      [(l - vp.ox) * dpr2, (t - vp.oy) * dpr2], // TL
-      [(r - vp.ox) * dpr2, (t - vp.oy) * dpr2], // TR
-      [(r - vp.ox) * dpr2, (b - vp.oy) * dpr2], // BR
-      [(l - vp.ox) * dpr2, (b - vp.oy) * dpr2], // BL
+      [(mX              - vp.ox) * dpr2, (rect.top    + ih - vp.oy) * dpr2], // top mid
+      [(rect.right - iw - vp.ox) * dpr2, (mY               - vp.oy) * dpr2], // right mid
+      [(mX              - vp.ox) * dpr2, (rect.bottom - ih - vp.oy) * dpr2], // bottom mid
+      [(rect.left  + iw - vp.ox) * dpr2, (mY               - vp.oy) * dpr2], // left mid
     ];
   }
 
@@ -2514,14 +2495,30 @@ document.addEventListener('DOMContentLoaded', () => {
         spark: main ? { t: rnd2(0, 1), spd: rnd2(0.004, 0.01), dir: 1 } : null,
       });
     }
+    // Center strike filament — fast spark, fades to ambient after ~0.5s
+    fils2.push({
+      ci: 0, freq: rnd2(0.3, 0.6), phase: rnd2(0, Math.PI * 2),
+      amp: 18 * dpr2, ampY: 12 * dpr2,
+      alpha: 0.90, lw: 1.5,
+      main: true, strike: true,
+      spark: { t: 0, spd: 0.030, dir: 1 },
+    });
   }
 
   function drawFil2(f, elapsed, alpha) {
-    if (!anchors2[f.ai]) return;
-    const [ax, ay] = anchors2[f.ai], [sx, sy] = srcPt2;
+    let ax, ay;
+    if (f.strike) {
+      [ax, ay] = strikeCenter2;
+    } else {
+      if (!anchors2[f.ai]) return;
+      [ax, ay] = anchors2[f.ai];
+    }
+    const [sx, sy] = srcPt2;
     const mx = (sx + ax) / 2 + Math.sin(elapsed * f.freq + f.phase) * f.amp;
     const my = (sy + ay) / 2 + Math.cos(elapsed * f.freq * 0.7 + f.phase) * f.ampY;
-    const c = COLORS[f.ci], a = f.alpha * alpha;
+    const c = COLORS[f.ci];
+    const strikeMulti2 = f.strike ? Math.max(0.35, 1.0 - elapsed * 1.8) : 1;
+    const a = f.alpha * alpha * strikeMulti2;
     ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
     if (f.main) {
       ctx2.globalAlpha = a * 0.22; ctx2.lineWidth = f.lw * dpr2 * 4;
@@ -2546,26 +2543,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Perimeter wrap: subtle edge strands that grip the card
-  function drawWrapEdges2(elapsed, alpha) {
-    if (anchors2.length < 4) return;
-    const edges = [[anchors2[0], anchors2[1]], [anchors2[1], anchors2[2]],
-                   [anchors2[2], anchors2[3]], [anchors2[3], anchors2[0]]];
-    ctx2.lineCap = 'round';
-    edges.forEach(([p0, p1], i) => {
-      const cx = (p0[0] + p1[0]) / 2 + Math.sin(elapsed * 0.8 + i * 1.5) * 5 * dpr2;
-      const cy = (p0[1] + p1[1]) / 2 + Math.cos(elapsed * 0.6 + i * 1.2) * 5 * dpr2;
-      const c  = COLORS[i % COLORS.length];
-      ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-      ctx2.globalAlpha = alpha * 0.13;
-      ctx2.lineWidth   = 2.5 * dpr2;
-      ctx2.beginPath(); ctx2.moveTo(p0[0], p0[1]); ctx2.quadraticCurveTo(cx, cy, p1[0], p1[1]); ctx2.stroke();
-      ctx2.globalAlpha = alpha * 0.22;
-      ctx2.lineWidth   = 0.7 * dpr2;
-      ctx2.beginPath(); ctx2.moveTo(p0[0], p0[1]); ctx2.quadraticCurveTo(cx, cy, p1[0], p1[1]); ctx2.stroke();
-    });
-  }
-
   function renderApproachTether(now) {
     ctx2.globalCompositeOperation = 'source-over'; ctx2.globalAlpha = 1;
     ctx2.clearRect(0, 0, W2, H2);
@@ -2576,7 +2553,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fadeAlpha2 > 0 && anchors2.length) {
       ctx2.save();
       for (let i = 0; i < fils2.length; i++) drawFil2(fils2[i], elapsed, fadeAlpha2);
-      drawWrapEdges2(elapsed, fadeAlpha2);
       ctx2.restore();
     }
     for (let i = bursts2.length - 1; i >= 0; i--) {
@@ -2595,8 +2571,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Recompute positions on scroll/resize while a panel is active
   function recompute2() {
     if (!activePanel2) return;
-    srcPt2   = getSrcPt();
-    anchors2 = cornerAnchors2(getTetherRect2(activePanel2));
+    srcPt2 = getSrcPt();
+    const r = activePanel2.getBoundingClientRect();
+    anchors2 = sideAnchors2(r);
+    const vp = getVP();
+    strikeCenter2 = [(r.left + r.width  * 0.5 - vp.ox) * dpr2,
+                     (r.top  + r.height * 0.5 - vp.oy) * dpr2];
   }
   let scrollTick2 = 0;
   function scheduleRecompute2() {
@@ -2619,8 +2599,12 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.addEventListener('pointerenter', () => {
       activePanel2 = panel;
       srcEl.classList.add('tether-headline-active');
-      srcPt2   = getSrcPt();
-      anchors2 = cornerAnchors2(getTetherRect2(panel));
+      srcPt2 = getSrcPt();
+      const r2 = panel.getBoundingClientRect();
+      anchors2 = sideAnchors2(r2);
+      const vp2 = getVP();
+      strikeCenter2 = [(r2.left + r2.width  * 0.5 - vp2.ox) * dpr2,
+                       (r2.top  + r2.height * 0.5 - vp2.oy) * dpr2];
       buildFils2(); fadeDir2 = 1; startTime2 = performance.now();
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
       setTimeout(() => {
