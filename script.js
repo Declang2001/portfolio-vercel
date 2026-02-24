@@ -27,6 +27,24 @@ const _wcsViewport = (() => {
   return { getViewport, getDprCap, makeRafThrottle, coarsePointer };
 })();
 
+// ── Dev mode: skip Cloudinary video loading on localhost / ?novideo ──
+const _vmDevMode = (
+  location.hostname === 'localhost' ||
+  location.hostname === '127.0.0.1' ||
+  new URLSearchParams(location.search).has('novideo')
+);
+
+// ── Cloudinary URL optimizer: inject f_auto,q_auto,vc_auto + width cap ──
+const _cldOpt = (() => {
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  const t = coarse ? 'f_auto,q_auto,vc_auto,w_720,c_limit' : 'f_auto,q_auto,vc_auto,w_960,c_limit';
+  return function (url) {
+    if (!url || !url.includes('/video/upload/')) return url;
+    if (url.includes(t)) return url;
+    return url.replace('/video/upload/', '/video/upload/' + t + '/');
+  };
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   // 1. Dynamic year in footer
   const yearSpan = document.getElementById('year');
@@ -1165,18 +1183,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    const playAllPausedVideos = () => {
-      lazyServiceVideos.forEach((video) => {
-        if (video.paused && video.src) {
-          video.muted = true;
-          video.play().catch(() => {});
-        }
-      });
-    };
-
-    document.addEventListener('touchstart', playAllPausedVideos, { once: true, passive: true });
-    document.addEventListener('scroll', playAllPausedVideos, { once: true, passive: true });
-
     if ('IntersectionObserver' in window) {
       const observer = new IntersectionObserver(
         (entries, obs) => {
@@ -1187,7 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
             obs.unobserve(video);
           });
         },
-        { root: null, rootMargin: '800px 0px', threshold: 0.01 }
+        { root: null, rootMargin: '200px 0px', threshold: 0.01 }
       );
 
       lazyServiceVideos.forEach((video) => observer.observe(video));
@@ -1196,24 +1202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 9. Eagerly load first few videos for instant playback
-  const eagerLoadFirstVideos = () => {
-    const firstVideos = document.querySelectorAll('.service-gallery video[data-autoplay]');
-    const toLoad = Array.from(firstVideos).slice(0, 3);
-
-    toLoad.forEach((video) => {
-      const sources = video.querySelectorAll('source[data-src]');
-      sources.forEach((source) => {
-        if (!source.src && source.dataset.src) source.src = source.dataset.src;
-      });
-      video.preload = 'auto';
-      video.load();
-    });
-  };
-
-  setTimeout(eagerLoadFirstVideos, 100);
-
-  // 10. Make entire case study card clickable (and remove the need for the arrow button)
+  // 9. Make entire case study card clickable (and remove the need for the arrow button)
   const caseStudyCards = document.querySelectorAll('.service-row.case-study[data-href]');
   if (caseStudyCards.length) {
     caseStudyCards.forEach((card) => {
@@ -1259,7 +1248,11 @@ function initApproachVideoModal() {
     if (video) {
       const clone = document.createElement('video');
       const source = video.querySelector('source');
-      clone.src = (source && source.src) || video.currentSrc || video.src;
+      clone.src = (source && source.getAttribute('src'))
+        || video.currentSrc
+        || video.getAttribute('src')
+        || video.dataset.src
+        || '';
       clone.autoplay = true;
       clone.loop = true;
       clone.muted = false;
@@ -2137,22 +2130,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-// Approach collage: auto cycle and fade between videos
+// Approach collage: auto cycle and fade between videos — lazy, visibility-gated
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.body.classList.contains('approach-page')) return;
 
-  // Force play all videos on first user interaction (mobile fix)
-  const playAllApproachVideos = () => {
-    document.querySelectorAll('.approach-page video').forEach((video) => {
-      if (video.paused) {
-        video.muted = true;
-        video.play().catch(() => {});
-      }
-    });
-  };
-
-  document.addEventListener('touchstart', playAllApproachVideos, { once: true, passive: true });
-  document.addEventListener('scroll', playAllApproachVideos, { once: true, passive: true });
+  const _prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Tile id -> list of files to cycle through in order
   const rotationMap = {
@@ -2165,41 +2147,40 @@ document.addEventListener('DOMContentLoaded', () => {
     'tile-delivery': ['https://res.cloudinary.com/ddpcw88mj/video/upload/d3.mp4']
   };
 
-  // Fetch all first videos early for fast startup
-  const allFirstVideos = Object.values(rotationMap).map((arr) => arr[0]);
-  allFirstVideos.forEach((src) => {
-    try {
-      fetch(src).catch(() => {});
-    } catch (_) {}
-  });
+  const rotationIds = new Set(Object.keys(rotationMap));
 
+  // ── Rotation map tiles: load + play only when near view ──
   Object.entries(rotationMap).forEach(([tileId, sources]) => {
     const tile = document.getElementById(tileId);
     if (!tile || !sources.length) return;
-
     const video = tile.querySelector('video');
-    if (!video) return;
+    if (!video || _vmDevMode || _prefersReduced) return;
 
     const hasMultiple = sources.length > 1;
     let index = 0;
 
-    video.preload = 'auto';
     video.style.width = '100%';
     video.style.height = '100%';
     video.style.objectFit = 'cover';
     video.style.display = 'block';
 
     function playCurrent() {
-      video.src = sources[index];
+      video.src = _cldOpt(sources[index]);
       video.load();
       const playPromise = video.play();
       if (playPromise && playPromise.catch) playPromise.catch(() => {});
     }
 
-    // Single clip tiles just loop
     if (!hasMultiple) {
       video.loop = true;
-      playCurrent();
+      new IntersectionObserver((entries, obs) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting && !video.getAttribute('src')) {
+            playCurrent();
+            obs.unobserve(video);
+          }
+        });
+      }, { rootMargin: '0px 200px 0px 200px', threshold: 0.1 }).observe(video);
       return;
     }
 
@@ -2207,7 +2188,6 @@ document.addEventListener('DOMContentLoaded', () => {
     video.loop = false;
     video.style.opacity = '1';
     video.style.transition = 'opacity 420ms ease';
-    playCurrent();
 
     function fadeToNext() {
       if (video.dataset.fading === 'out') return;
@@ -2217,19 +2197,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     video.addEventListener('transitionend', (event) => {
       if (event.propertyName !== 'opacity') return;
-
       if (video.dataset.fading === 'out') {
         index = (index + 1) % sources.length;
         video.dataset.fading = 'in';
-
-        video.src = sources[index];
+        video.src = _cldOpt(sources[index]);
         video.load();
         const promise = video.play();
         if (promise && promise.catch) promise.catch(() => {});
-
-        requestAnimationFrame(() => {
-          video.style.opacity = '1';
-        });
+        requestAnimationFrame(() => { video.style.opacity = '1'; });
       } else if (video.dataset.fading === 'in') {
         video.dataset.fading = '';
       }
@@ -2237,7 +2212,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
     video.addEventListener('ended', fadeToNext);
     tile.addEventListener('click', fadeToNext);
+
+    new IntersectionObserver((entries, obs) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting && !video.getAttribute('src')) {
+          playCurrent();
+          obs.unobserve(video);
+        }
+      });
+    }, { rootMargin: '0px 200px 0px 200px', threshold: 0.1 }).observe(video);
   });
+
+  // ── Video Manager: simple approach tile videos (non-rotation, non-storyboard) ──
+  if (!_vmDevMode && !_prefersReduced) {
+    let vmActive = null;
+
+    const vmVideos = Array.from(document.querySelectorAll('.approach-tile-video video')).filter((v) => {
+      if (v.id === 'storyboardPlaylistVideo') return false;
+      const article = v.closest('article[id]');
+      return !article || !rotationIds.has(article.id);
+    });
+
+    if (vmVideos.length) {
+      const vmObs = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting && !e.target.paused) e.target.pause();
+        });
+        const best = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (best) {
+          const v = best.target;
+          if (vmActive && vmActive !== v && !vmActive.paused) vmActive.pause();
+          vmActive = v;
+          if (!v.getAttribute('src') && v.dataset.src) {
+            v.src = _cldOpt(v.dataset.src);
+            v.load();
+          }
+          v.muted = true;
+          const p = v.play();
+          if (p && p.catch) p.catch(() => {});
+        }
+      }, { rootMargin: '0px 200px 0px 200px', threshold: [0.1, 0.35, 0.6] });
+      vmVideos.forEach((v) => vmObs.observe(v));
+    }
+  }
+
+  // ── Storyboard playlist (visibility-gated) ──
+  const sbVideo = document.getElementById('storyboardPlaylistVideo');
+  if (sbVideo && !_vmDevMode && !_prefersReduced) {
+    const sbPlaylist = ['https://res.cloudinary.com/ddpcw88mj/video/upload/lab8.mp4'];
+    let sbIndex = 0;
+
+    function sbPlayCurrent() {
+      sbVideo.src = _cldOpt(sbPlaylist[sbIndex]);
+      sbVideo.load();
+      sbVideo.muted = true;
+      const p = sbVideo.play();
+      if (p && p.catch) p.catch(() => {});
+    }
+
+    sbVideo.addEventListener('ended', () => {
+      sbIndex = (sbIndex + 1) % sbPlaylist.length;
+      sbPlayCurrent();
+    });
+
+    new IntersectionObserver((entries, obs) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting && !sbVideo.getAttribute('src')) {
+          sbPlayCurrent();
+          obs.unobserve(sbVideo);
+        }
+      });
+    }, { rootMargin: '0px 200px 0px 200px', threshold: 0.1 }).observe(sbVideo);
+  }
 });
 
 
