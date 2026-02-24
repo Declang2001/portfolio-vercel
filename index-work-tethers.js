@@ -1,4 +1,4 @@
-// ── Tethers v4: corner anchors, tilt-matrix glued, scroll-stable ──────────────
+// ── Tethers v5: center-pivot DOMMatrix rotation glue, scroll-stable ──────────
 // Index page only. Reduced-motion and coarse-pointer aware.
 (() => {
   'use strict';
@@ -37,11 +37,12 @@
   let fadeAlpha = 0, fadeDir = 0, startTime = 0;
   let srcPts = [], srcSeeds = [], anchors = [], filaments = [], bursts = [];
   let tetherRGB = FALLBACK_RGB.slice();
-  let targetEl = null, targetLocalW = 0, targetLocalH = 0;
-  let transformEl = null, transformOrigin = [0, 0];
-  let panelRect = null, targetOffset = [0, 0], targetInTransform = [0, 0];
+
+  // Panel geometry — cached from getBoundingClientRect on hover start + recompute events
+  let panelCx = 0, panelCy = 0, panelHW = 0, panelHH = 0;
+  // Reference (untilted) transform matrix captured at hover start
+  let M0base = new DOMMatrix();
   let lastTiltUpdateAt = 0;
-  let transformCandidates = [];
 
   const rnd = (a, b) => Math.random() * (b - a) + a;
 
@@ -107,138 +108,42 @@
     srcPts = srcSeeds.map((s) => toCanvas(r.left + r.width * s.nx, r.top + r.height * s.ny));
   }
 
-  function parseOriginToken(tok, ref, axis) {
-    if (!tok) return ref * 0.5;
-    if (tok.endsWith('%')) return (parseFloat(tok) || 0) * 0.01 * ref;
-    if (tok.endsWith('px')) return parseFloat(tok) || 0;
-    if (axis === 'x') {
-      if (tok === 'left') return 0;
-      if (tok === 'center') return ref * 0.5;
-      if (tok === 'right') return ref;
-    } else {
-      if (tok === 'top') return 0;
-      if (tok === 'center') return ref * 0.5;
-      if (tok === 'bottom') return ref;
-    }
-    const n = parseFloat(tok);
-    return Number.isFinite(n) ? n : ref * 0.5;
+  // ── Panel geometry: cache from getBoundingClientRect (hover start + events) ─
+  function refreshPanelGeometry() {
+    if (!activePanel) return;
+    const r = activePanel.getBoundingClientRect();
+    panelCx = r.left + r.width  * 0.5;
+    panelCy = r.top  + r.height * 0.5;
+    panelHW = r.width  * 0.5;
+    panelHH = r.height * 0.5;
+    // Capture the untilted base transform so we can isolate rotation delta
+    const tf = getComputedStyle(activePanel).transform;
+    M0base = (!tf || tf === 'none') ? new DOMMatrix() : new DOMMatrix(tf);
   }
 
-  function readOriginPx(el, w, h) {
-    const cs = getComputedStyle(el);
-    const bits = (cs.transformOrigin || '').trim().split(/\s+/);
-    const ox = parseOriginToken(bits[0], w, 'x');
-    const oy = parseOriginToken(bits[1] || bits[0], h, 'y');
-    return [ox, oy];
-  }
-
-  function addCandidate(list, el) {
-    if (!el || list.includes(el)) return;
-    list.push(el);
-  }
-
-  function pickTargetElement(panel) {
-    const media = panel.querySelector('video, img');
-    const preferred = panel.querySelector('.comic-panel-video')
-      || panel.querySelector('[class*="comic-panel-video"]')
-      || (media && media.closest('.comic-panel-video'))
-      || (media && media.parentElement)
-      || media
-      || panel;
-    return preferred;
-  }
-
-  function buildTransformCandidates(panel, target) {
-    const list = [];
-    addCandidate(list, panel);
-    let cur = target;
-    while (cur && cur !== panel) {
-      addCandidate(list, cur);
-      cur = cur.parentElement;
-    }
-    addCandidate(list, panel.firstElementChild);
-    addCandidate(list, panel.lastElementChild);
-    return list;
-  }
-
-  function chooseTransformElement(panel, target, t0, t1) {
-    for (let i = 0; i < transformCandidates.length; i++) {
-      const el = transformCandidates[i];
-      const a = t0.get(el) || 'none';
-      const b = t1.get(el) || 'none';
-      if (a !== b) return el;
-    }
-    if ((t1.get(target) || 'none') !== 'none') return target;
-    if ((t1.get(panel) || 'none') !== 'none') return panel;
-    for (let i = 0; i < transformCandidates.length; i++) {
-      const el = transformCandidates[i];
-      if ((t1.get(el) || 'none') !== 'none') return el;
-    }
-    return target || panel;
-  }
-
-  function sampleCandidateTransforms() {
-    const map = new Map();
-    for (let i = 0; i < transformCandidates.length; i++) {
-      const el = transformCandidates[i];
-      map.set(el, getComputedStyle(el).transform || 'none');
-    }
-    return map;
-  }
-
-  function primeTransformElement(panel, target) {
-    transformCandidates = buildTransformCandidates(panel, target);
-    const s0 = sampleCandidateTransforms();
-    requestAnimationFrame(() => {
-      if (activePanel !== panel) return;
-      const s1 = sampleCandidateTransforms();
-      transformEl = chooseTransformElement(panel, target, s0, s1);
-      refreshTransformCache();
-      updateAnchorsFromTransform();
-    });
-  }
-
-  function refreshTransformCache() {
-    if (!transformEl || !targetEl || !activePanel) return;
-    const targetRect = targetEl.getBoundingClientRect();
-    const transformRect = transformEl.getBoundingClientRect();
-    panelRect = activePanel.getBoundingClientRect();
-    targetOffset = [targetRect.left - panelRect.left, targetRect.top - panelRect.top];
-    targetInTransform = [targetRect.left - transformRect.left, targetRect.top - transformRect.top];
-    targetLocalW = targetEl.offsetWidth || targetRect.width || 0;
-    targetLocalH = targetEl.offsetHeight || targetRect.height || 0;
-    const tw = transformEl.offsetWidth || transformRect.width || 0;
-    const th = transformEl.offsetHeight || transformRect.height || 0;
-    transformOrigin = readOriginPx(transformEl, tw, th);
-  }
-
-  function projectLocalPoint(localX, localY) {
-    if (!transformEl || !panelRect) return null;
-    const tf = getComputedStyle(transformEl).transform;
-    const m = (!tf || tf === 'none') ? new DOMMatrix() : new DOMMatrix(tf);
-    const ox = transformOrigin[0], oy = transformOrigin[1];
-    const tx = targetInTransform[0] + localX;
-    const ty = targetInTransform[1] + localY;
-    const p = new DOMPoint(tx - ox, ty - oy, 0, 1).matrixTransform(m);
-    const w = (p.w && Number.isFinite(p.w) && p.w !== 0) ? p.w : 1;
-    const projectedLocalX = (p.x / w) + ox - targetInTransform[0];
-    const projectedLocalY = (p.y / w) + oy - targetInTransform[1];
-    return [panelRect.left + targetOffset[0] + projectedLocalX,
-            panelRect.top  + targetOffset[1] + projectedLocalY];
-  }
-
-  function updateAnchorsFromTransform() {
-    if (!transformEl || !targetEl || !panelRect || targetLocalW <= 0 || targetLocalH <= 0) return;
-    const inset = 1.5;
-    const localPts = [
-      [inset, inset],                              // top-left
-      [Math.max(inset, targetLocalW - inset), inset], // top-right
-      [Math.max(inset, targetLocalW - inset), Math.max(inset, targetLocalH - inset)], // bottom-right
-      [inset, Math.max(inset, targetLocalH - inset)], // bottom-left
+  // ── Anchor update: project corners via rotation-only delta matrix ─────────
+  // Mrot = M0base⁻¹ × Mcurrent extracts only the rotation part of the tilt,
+  // leaving the translate/scale already captured in panelCx/panelCy/panelHW/panelHH.
+  // Called at ~30 fps so easing is tracked even when the pointer stops.
+  // No getBoundingClientRect inside this function.
+  function updateAnchors() {
+    if (!activePanel || panelHW <= 0) return;
+    const tf = getComputedStyle(activePanel).transform;
+    const Mc = (!tf || tf === 'none') ? new DOMMatrix() : new DOMMatrix(tf);
+    let Mrot;
+    try { Mrot = M0base.inverse().multiply(Mc); } catch (_) { Mrot = new DOMMatrix(); }
+    const vp = getVP();
+    const corners = [
+      [-panelHW, -panelHH],
+      [ panelHW, -panelHH],
+      [ panelHW,  panelHH],
+      [-panelHW,  panelHH],
     ];
-    anchors = localPts.map((pt) => {
-      const projected = projectLocalPoint(pt[0], pt[1]);
-      return projected ? toCanvas(projected[0], projected[1]) : [0, 0];
+    anchors = corners.map(([dx, dy]) => {
+      const p = new DOMPoint(dx, dy, 0, 1).matrixTransform(Mrot);
+      const w = (p.w && Number.isFinite(p.w) && p.w !== 0) ? p.w : 1;
+      return [(panelCx - vp.ox + p.x / w) * dpr,
+              (panelCy - vp.oy + p.y / w) * dpr];
     });
   }
 
@@ -246,8 +151,8 @@
   function recomputeRects() {
     if (!activePanel) return;
     remapSourcePoints();
-    refreshTransformCache();
-    updateAnchorsFromTransform();
+    refreshPanelGeometry(); // re-reads rect + M0base (tilt cleared on scroll by tilt system)
+    updateAnchors();
   }
   let scrollTick = 0;
   const scheduleRecompute = () => {
@@ -343,9 +248,10 @@
       : fadeDir < 0
         ? Math.max(fadeAlpha - 0.06, 0)
         : fadeAlpha;
+    // Update corner anchors at ~30 fps to track tilt easing (no getBoundingClientRect)
     if (activePanel && now - lastTiltUpdateAt >= 33) {
       lastTiltUpdateAt = now;
-      updateAnchorsFromTransform();
+      updateAnchors();
     }
     const elapsed = (now - startTime) * 0.001;
     if (fadeAlpha > 0 && anchors.length > 0) {
@@ -378,33 +284,38 @@
   panels.forEach((panel) => {
     panel.addEventListener('pointerenter', () => {
       activePanel = panel;
-      targetEl = pickTargetElement(panel);
-      transformEl = targetEl;
       lastTiltUpdateAt = 0;
       srcSeeds = buildSourceSeeds(MAIN_COUNT + MICRO_COUNT);
       captureTetherRGB();
-      refreshTransformCache();
+      refreshPanelGeometry(); // getBoundingClientRect + M0base, tilt=0 at enter
       remapSourcePoints();
-      updateAnchorsFromTransform();
-      primeTransformElement(panel, targetEl);
+      updateAnchors();
       buildFilaments();
       fadeDir = 1; startTime = performance.now();
       if (!raf) raf = requestAnimationFrame(render);
+      // Re-read rect after is-active transition settles (~120ms), without M0base
+      // so the rotation delta stays correct while easing continues.
+      setTimeout(() => {
+        if (activePanel !== panel) return;
+        const r = panel.getBoundingClientRect();
+        panelCx = r.left + r.width  * 0.5;
+        panelCy = r.top  + r.height * 0.5;
+        panelHW = r.width  * 0.5;
+        panelHH = r.height * 0.5;
+        updateAnchors();
+      }, 200);
       setTimeout(fireArrivalBursts, 120);
     }, { passive: true });
 
     panel.addEventListener('pointermove', () => {
       if (activePanel !== panel) return;
-      updateAnchorsFromTransform();
+      updateAnchors();
     }, { passive: true });
 
     panel.addEventListener('pointerleave', () => {
       if (activePanel === panel) {
         activePanel = null;
-        targetEl = null;
-        transformEl = null;
-        panelRect = null;
-        transformCandidates = [];
+        panelHW = 0;
         fadeDir = -1;
       }
       if (!raf) raf = requestAnimationFrame(render);

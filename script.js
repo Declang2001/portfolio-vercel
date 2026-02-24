@@ -2419,14 +2419,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!window.matchMedia('(hover: hover)').matches) return;
 
-  // Prefer innermost headline element so filaments originate from the text
-  const srcEl = document.querySelector('.approach-title h2')
-              || document.querySelector('.approach-title .headline')
-              || document.querySelector('.approach-title');
+  // .approach-title is the h2 itself after the headline simplification
+  const srcEl = document.querySelector('.approach-title')
+              || document.querySelector('.approach-header h2');
   const panels = document.querySelectorAll('#collageStack .collage-panel');
   if (!srcEl || !panels.length) return;
 
   const WHITE_RGB2 = [255, 255, 255];
+  // Exact value of --accent: #a855f7 from style.css (:root)
   const FALLBACK_PURPLE_RGB2 = [168, 85, 247];
   const MAIN_N = 4, MICRO_N = 2;
 
@@ -2559,8 +2559,8 @@ document.addEventListener('DOMContentLoaded', () => {
       fils2.push({
         ai: i % anchors2.length, si: i % srcSeeds2.length, ci: 0,
         freq: rnd2(0.5, 1.6), phase: rnd2(0, Math.PI * 2),
-        amp:  rnd2(main ? 35 : 12, main ? 80 : 35) * dpr2,
-        ampY: rnd2(main ? 20 : 8,  main ? 50 : 20) * dpr2,
+        amp:  rnd2(main ? 18 : 6, main ? 42 : 18) * dpr2,
+        ampY: rnd2(main ? 10 : 4, main ? 25 : 10) * dpr2,
         alpha: main ? rnd2(0.65, 0.85) : rnd2(0.22, 0.38),
         lw: main ? rnd2(1.2, 1.8) : rnd2(0.6, 0.9), main,
         spark: main ? { t: rnd2(0, 1), spd: rnd2(0.004, 0.01), dir: 1 } : null,
