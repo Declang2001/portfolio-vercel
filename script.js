@@ -2425,7 +2425,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const panels = document.querySelectorAll('#collageStack .collage-panel');
   if (!srcEl || !panels.length) return;
 
-  const WHITE_RGB2 = [255, 255, 255];
   // Exact value of --accent: #a855f7 from style.css (:root)
   const FALLBACK_PURPLE_RGB2 = [168, 85, 247];
   const MAIN_N = 4, MICRO_N = 2;
@@ -2453,8 +2452,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let startTime2 = 0, activePanel2 = null;
   let srcPts2 = [], srcSeeds2 = [], anchors2 = [], fils2 = [], bursts2 = [];
   let purpleRGB2 = FALLBACK_PURPLE_RGB2.slice();
-  let tetherRGB2 = WHITE_RGB2.slice();
-  let tileHot2 = false;
+  let tetherRGB2 = FALLBACK_PURPLE_RGB2.slice();
   let panelRO2 = null;
   const rnd2 = (a, b) => Math.random() * (b - a) + a;
 
@@ -2485,11 +2483,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function capturePurpleRGB2() {
     const c = parseColorToRGB2(getComputedStyle(srcEl).color);
     purpleRGB2 = c || FALLBACK_PURPLE_RGB2.slice();
-  }
-
-  function setTileHot2(nextHot) {
-    tileHot2 = !!nextHot;
-    tetherRGB2 = tileHot2 ? purpleRGB2 : WHITE_RGB2;
   }
 
   function buildSourceSeeds2(total) {
@@ -2654,7 +2647,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activePanel2 = panel;
       srcEl.classList.add('tether-headline-active');
       capturePurpleRGB2();
-      setTileHot2(false);
+      tetherRGB2 = purpleRGB2;
       srcSeeds2 = buildSourceSeeds2(MAIN_N + MICRO_N);
       remapSourcePoints2();
       const r2 = panel.getBoundingClientRect();
@@ -2676,16 +2669,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 120);
     }, { passive: true });
 
-    panel.addEventListener('pointermove', (e) => {
-      if (activePanel2 !== panel) return;
-      const isTile = !!e.target.closest('.approach-tile, .approach-tile-video');
-      if (isTile !== tileHot2) setTileHot2(isTile);
-    }, { passive: true });
-
     panel.addEventListener('pointerleave', () => {
       if (activePanel2 === panel) {
         activePanel2 = null;
-        setTileHot2(false);
         detachPanelObserver2();
         fadeDir2 = -1;
         srcEl.classList.remove('tether-headline-active');
