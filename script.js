@@ -1773,7 +1773,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let workRect = null, seedFired = false;
     let reduced = false, staticDone = false, isCoarse = false;
     let cometActive = false, cometSX = 0, cometSY = 0, cometT0 = 0;
-    let cometEX = 0, cometEY = 0, cometBolt = [];
+    let cometEX = 0, cometEY = 0, cometCPX = 0, cometCPY = 0, cometTail = [];
     let fragments = [], shockwaves = [];
 
     const rnd = (a, b) => Math.random() * (b - a) + a;
@@ -1823,7 +1823,7 @@ document.addEventListener('DOMContentLoaded', () => {
       dpr = _wcsViewport.getDprCap();
       W = (lW * dpr) | 0; H = (lH * dpr) | 0;
       driftCanvas.width = W; driftCanvas.height = H;
-      initPool(); fragments = []; shockwaves = [];
+      initPool(); fragments = []; shockwaves = []; cometTail = [];
       if (workAccent) workRect = workAccent.getBoundingClientRect();
       updateCanvasRect();
       if (reduced && !staticDone) renderStatic();
@@ -1947,77 +1947,79 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Pre-compute a deterministic zigzag bolt shape when comet fires
-    function fireCometBolt() {
+    // Init cinematic comet: smooth bezier arc, no jagged bolt
+    function initComet() {
       cometEX = W / 2; cometEY = H / 2;
+      const midX = (cometSX + cometEX) / 2, midY = (cometSY + cometEY) / 2;
       const ddx = cometEX - cometSX, ddy = cometEY - cometSY;
       const len = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
       const nx = -ddy / len, ny = ddx / len; // perpendicular unit
-      let lv = 0xdeadbeef | 0;
-      const lcg = () => { lv = Math.imul(1664525, lv) + 1013904223 | 0; return (lv >>> 0) / 0x100000000; };
-      const SEGS = 9;
-      cometBolt = [];
-      for (let i = 1; i < SEGS; i++) {
-        const rt = i / SEGS;
-        const amp = (lcg() - 0.5) * 2 * 38 * dpr;
-        cometBolt.push({ rt, x: cometSX + ddx * rt + nx * amp, y: cometSY + ddy * rt + ny * amp });
-      }
+      cometCPX = midX + nx * len * 0.22;    // gentle arc offset
+      cometCPY = midY + ny * len * 0.22;
+      cometTail = [];
     }
 
     function drawComet(now) {
       if (!cometActive) return;
       const t = Math.min((now - cometT0) / CFG.COMET_DUR, 1);
       const e = 1 - (1 - t) * (1 - t) * (1 - t); // easeOutCubic
-      const hx = cometSX + (cometEX - cometSX) * e;
-      const hy = cometSY + (cometEY - cometSY) * e;
+      // Quadratic bezier head position
+      const mt = 1 - e;
+      const hx = mt*mt*cometSX + 2*mt*e*cometCPX + e*e*cometEX;
+      const hy = mt*mt*cometSY + 2*mt*e*cometCPY + e*e*cometEY;
 
-      // Build visible bolt polyline up to current head
-      const bpts = [[cometSX, cometSY]];
-      for (let i = 0; i < cometBolt.length; i++) {
-        if (cometBolt[i].rt > e) break;
-        bpts.push([cometBolt[i].x, cometBolt[i].y]);
-      }
-      bpts.push([hx, hy]);
+      // Maintain tail history (capped)
+      const TAIL_LEN = 18;
+      cometTail.push({ x: hx, y: hy });
+      if (cometTail.length > TAIL_LEN) cometTail.shift();
 
-      ctx.save();
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       const eff = intensity || 1;
+      const n = cometTail.length;
+      ctx.save();
+      ctx.lineCap = 'round';
 
-      // Outer ion glow
-      ctx.globalAlpha = 0.50 * eff;
-      ctx.strokeStyle = ISTR;
-      ctx.lineWidth = 7 * dpr;
-      ctx.shadowColor = ISTR; ctx.shadowBlur = 20 * dpr;
-      ctx.beginPath(); ctx.moveTo(bpts[0][0], bpts[0][1]);
-      for (let i = 1; i < bpts.length; i++) ctx.lineTo(bpts[i][0], bpts[i][1]);
-      ctx.stroke();
+      // Tail: tapered glow + core passes, older segments dimmer and thinner
+      for (let i = 1; i < n; i++) {
+        const p0 = cometTail[i - 1], p1 = cometTail[i];
+        const frac = i / n; // 0 = tail tip, 1 = head
 
-      // White core bolt
+        // Outer glow (ion cyan, wide, soft)
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = frac * 0.48 * eff;
+        ctx.strokeStyle = ISTR;
+        ctx.lineWidth = (1.5 + frac * 9) * dpr;
+        ctx.shadowColor = ISTR; ctx.shadowBlur = 14 * dpr;
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+
+        // Core (near-white, crisp)
+        ctx.globalAlpha = frac * 0.92 * eff;
+        ctx.strokeStyle = 'rgb(228,244,255)';
+        ctx.lineWidth = (0.4 + frac * 2.2) * dpr;
+        ctx.shadowColor = '#fff'; ctx.shadowBlur = 4 * dpr;
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+      }
+
+      // Bright head
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 0.55 * eff;
+      ctx.fillStyle = ISTR;
+      ctx.shadowColor = ISTR; ctx.shadowBlur = CFG.COMET_GLOW * 2 * dpr;
+      ctx.beginPath(); ctx.arc(hx, hy, CFG.COMET_R * 2.8 * dpr, 0, 6.283); ctx.fill();
       ctx.globalAlpha = 0.95 * eff;
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2 * dpr;
-      ctx.shadowColor = '#fff'; ctx.shadowBlur = 6 * dpr;
-      ctx.beginPath(); ctx.moveTo(bpts[0][0], bpts[0][1]);
-      for (let i = 1; i < bpts.length; i++) ctx.lineTo(bpts[i][0], bpts[i][1]);
-      ctx.stroke();
-
-      // Head orb
-      ctx.globalAlpha = 0.90 * eff;
       ctx.fillStyle = '#fff';
-      ctx.shadowColor = ISTR; ctx.shadowBlur = CFG.COMET_GLOW * dpr;
+      ctx.shadowColor = '#fff'; ctx.shadowBlur = CFG.COMET_GLOW * 0.5 * dpr;
       ctx.beginPath(); ctx.arc(hx, hy, CFG.COMET_R * dpr, 0, 6.283); ctx.fill();
       ctx.restore();
 
       if (t >= 1) {
-        cometActive = false;
+        cometActive = false; cometTail = [];
         spawnShockwave(hx, hy, CFG.ION); spawnShockwave(hx, hy, CFG.COLORS[2]);
         const now2 = performance.now();
         for (let i = 0; i < CFG.COMET_FRAGS; i++) {
-          const a = Math.PI * 2 * i / CFG.COMET_FRAGS + rnd(-0.4, 0.4);
-          const sp = rnd(3.5, 8);
+          const a = Math.PI * 2 * i / CFG.COMET_FRAGS + rnd(-0.3, 0.3);
+          const sp = rnd(4, 9);
           fragments.push({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-                           r: rnd(2, 4.5) * dpr, ci: (i * 3) % 4,
-                           st: now2, life: rnd(CFG.FRAG_LIFE * 0.55, CFG.FRAG_LIFE) });
+                           r: rnd(1.5, 4) * dpr, ci: (i * 3) % 4,
+                           st: now2, life: rnd(CFG.FRAG_LIFE * 0.6, CFG.FRAG_LIFE) });
         }
       }
     }
@@ -2134,12 +2136,12 @@ document.addEventListener('DOMContentLoaded', () => {
           const sx = ((workRect.left + workRect.width / 2) - canvasRect.left) * dpr;
           const sy = ((workRect.top + workRect.height / 2) - canvasRect.top) * dpr;
           cometSX = sx; cometSY = sy;
-          fireCometBolt();
+          initComet();
           cometActive = true; cometT0 = performance.now();
           seedFired = true;
         }
         if (progress < 0.2 && seedFired) {
-          seedFired = false; cometActive = false; fragments = [];
+          seedFired = false; cometActive = false; fragments = []; cometTail = [];
         }
       },
 
@@ -2600,6 +2602,7 @@ document.addEventListener('DOMContentLoaded', () => {
   panels.forEach((panel) => {
     panel.addEventListener('pointerenter', () => {
       activePanel2 = panel;
+      srcEl.classList.add('tether-headline-active');
       srcPt2   = getSrcPt();
       anchors2 = edgeAnchors(srcPt2[0], srcPt2[1], panel.getBoundingClientRect(), MAIN_N + MICRO_N);
       buildFils2(); fadeDir2 = 1; startTime2 = performance.now();
@@ -2619,7 +2622,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: true });
 
     panel.addEventListener('pointerleave', () => {
-      if (activePanel2 === panel) { activePanel2 = null; fadeDir2 = -1; }
+      if (activePanel2 === panel) {
+        activePanel2 = null; fadeDir2 = -1;
+        srcEl.classList.remove('tether-headline-active');
+      }
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
     }, { passive: true });
   });

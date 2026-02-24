@@ -3366,3 +3366,14 @@ body.services-active .services::before {
   background: linear-gradient(135deg, #0a0a0a 0%, #111 60%, #0d0816 100%);
   border-radius: inherit;
 }
+
+/* Approach tether: headline turns purple+glow while collage card is hovered */
+.approach-title {
+  transition: color 150ms ease, text-shadow 150ms ease;
+}
+.tether-headline-active {
+  color: var(--accent) !important;
+  text-shadow:
+    0 0 6px  rgba(168, 85, 247, 0.70),
+    0 0 16px rgba(168, 85, 247, 0.40);
+}
