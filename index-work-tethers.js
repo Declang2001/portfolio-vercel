@@ -27,7 +27,7 @@
     [204,  85, 255],  // magenta
     [68,  136, 255],  // blue
   ];
-  const MAIN_COUNT = 3, MICRO_COUNT = 2;
+  const MAIN_COUNT = 4, MICRO_COUNT = 2;
 
   // ── Canvas setup ─────────────────────────────────────────────────────────
   const canvas = document.createElement('canvas');
@@ -59,59 +59,45 @@
             (r.top  + r.height * 0.60 - vp.oy) * dpr];
   }
 
-  // ── Edge-intersection anchors ─────────────────────────────────────────────
-  // Finds which card face the ray from source→card center hits, then spreads
-  // MAIN_COUNT + MICRO_COUNT anchors along that edge — no random perimeter walk.
-  function edgeAnchors(rect, count) {
+  // ── Tether target: union rect of all child media (fixes multi-tile panels) ─
+  function getTetherRect(panel) {
+    const media = [...panel.querySelectorAll('video, img')];
+    if (media.length === 0) return panel.getBoundingClientRect();
+    if (media.length === 1) return media[0].getBoundingClientRect();
+    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
+    for (const m of media) {
+      const r = m.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if (r.left   < minL) minL = r.left;
+      if (r.top    < minT) minT = r.top;
+      if (r.right  > maxR) maxR = r.right;
+      if (r.bottom > maxB) maxB = r.bottom;
+    }
+    if (!isFinite(minL)) return panel.getBoundingClientRect();
+    return { left: minL, top: minT, right: maxR, bottom: maxB,
+             width: maxR - minL, height: maxB - minT };
+  }
+
+  // ── Corner anchors: TL/TR/BR/BL with clamped inset ───────────────────────
+  function cornerAnchors(rect) {
     const vp = getVP();
-    const { left, right, top, bottom, width, height } = rect;
-    const srcVX = srcCenter[0] / dpr + vp.ox;
-    const srcVY = srcCenter[1] / dpr + vp.oy;
-    const cardCX = left + width * 0.5, cardCY = top + height * 0.5;
-    const ddx = cardCX - srcVX, ddy = cardCY - srcVY;
-    const dlen = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
-    const ux = ddx / dlen, uy = ddy / dlen;
-    const INSET = 5;
-    const hits = [];
-    const tryEdge = (t, x, y, edge) => {
-      if (t > 0 && x >= left - 1 && x <= right + 1 && y >= top - 1 && y <= bottom + 1)
-        hits.push({ t, x, y, edge });
-    };
-    if (Math.abs(ux) > 1e-4) {
-      tryEdge((left  - srcVX) / ux, left,  srcVY + uy * (left  - srcVX) / ux, 'left');
-      tryEdge((right - srcVX) / ux, right, srcVY + uy * (right - srcVX) / ux, 'right');
-    }
-    if (Math.abs(uy) > 1e-4) {
-      tryEdge((top    - srcVY) / uy, srcVX + ux * (top    - srcVY) / uy, top,    'top');
-      tryEdge((bottom - srcVY) / uy, srcVX + ux * (bottom - srcVY) / uy, bottom, 'bottom');
-    }
-    hits.sort((a, b) => a.t - b.t);
-    const hit = hits[0] || { x: cardCX, y: cardCY, edge: 'bottom' };
-    let bx = hit.x, by = hit.y;
-    if (hit.edge === 'left')   bx += INSET;
-    if (hit.edge === 'right')  bx -= INSET;
-    if (hit.edge === 'top')    by += INSET;
-    if (hit.edge === 'bottom') by -= INSET;
-    const tgX = (hit.edge === 'left' || hit.edge === 'right') ? 0 : 1;
-    const tgY = (hit.edge === 'left' || hit.edge === 'right') ? 1 : 0;
-    const eLen = (hit.edge === 'left' || hit.edge === 'right') ? height : width;
-    const spread = eLen * 0.22;
-    const pts = [];
-    for (let i = 0; i < count; i++) {
-      const off = count > 1 ? (i / (count - 1) - 0.5) * 2 * spread : 0;
-      let ax = bx + tgX * off, ay = by + tgY * off;
-      ax = Math.max(left + INSET, Math.min(right - INSET, ax));
-      ay = Math.max(top + INSET, Math.min(bottom - INSET, ay));
-      pts.push([(ax - vp.ox) * dpr, (ay - vp.oy) * dpr]);
-    }
-    return pts;
+    const iw = Math.min(4, rect.width  * 0.10);
+    const ih = Math.min(4, rect.height * 0.10);
+    const l = rect.left  + iw, r = rect.right  - iw;
+    const t = rect.top   + ih, b = rect.bottom - ih;
+    return [
+      [(l - vp.ox) * dpr, (t - vp.oy) * dpr], // TL
+      [(r - vp.ox) * dpr, (t - vp.oy) * dpr], // TR
+      [(r - vp.ox) * dpr, (b - vp.oy) * dpr], // BR
+      [(l - vp.ox) * dpr, (b - vp.oy) * dpr], // BL
+    ];
   }
 
   // ── Recompute on scroll/resize while hovering ─────────────────────────────
   function recomputeRects() {
     if (!activePanel) return;
     srcCenter = computeSrcCenter();
-    anchors   = edgeAnchors(activePanel.getBoundingClientRect(), MAIN_COUNT + MICRO_COUNT);
+    anchors   = cornerAnchors(getTetherRect(activePanel));
   }
   let scrollTick = 0;
   const scheduleRecompute = () => {
@@ -188,6 +174,26 @@
     }
   }
 
+  // ── Perimeter wrap: subtle edge strands that grip the card ───────────────
+  function drawWrapEdges(elapsed, alpha) {
+    if (anchors.length < 4) return;
+    const edges = [[anchors[0], anchors[1]], [anchors[1], anchors[2]],
+                   [anchors[2], anchors[3]], [anchors[3], anchors[0]]];
+    ctx.lineCap = 'round';
+    edges.forEach(([p0, p1], i) => {
+      const cx = (p0[0] + p1[0]) / 2 + Math.sin(elapsed * 0.8 + i * 1.5) * 5 * dpr;
+      const cy = (p0[1] + p1[1]) / 2 + Math.cos(elapsed * 0.6 + i * 1.2) * 5 * dpr;
+      const c  = COLORS[i % COLORS.length];
+      ctx.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx.globalAlpha = alpha * 0.13;
+      ctx.lineWidth   = 2.5 * dpr;
+      ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.quadraticCurveTo(cx, cy, p1[0], p1[1]); ctx.stroke();
+      ctx.globalAlpha = alpha * 0.22;
+      ctx.lineWidth   = 0.7 * dpr;
+      ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.quadraticCurveTo(cx, cy, p1[0], p1[1]); ctx.stroke();
+    });
+  }
+
   // ── Contact bursts ────────────────────────────────────────────────────────
   function spawnBurst(bx, by, now) {
     for (let j = 0; j < 5; j++) {
@@ -210,6 +216,7 @@
     if (fadeAlpha > 0 && anchors.length > 0) {
       ctx.save();
       for (let i = 0; i < filaments.length; i++) drawFilament(filaments[i], elapsed, fadeAlpha);
+      drawWrapEdges(elapsed, fadeAlpha);
       ctx.restore();
     }
     for (let i = bursts.length - 1; i >= 0; i--) {
@@ -238,7 +245,7 @@
     panel.addEventListener('pointerenter', () => {
       activePanel = panel;
       srcCenter = computeSrcCenter();
-      anchors   = edgeAnchors(panel.getBoundingClientRect(), MAIN_COUNT + MICRO_COUNT);
+      anchors   = cornerAnchors(getTetherRect(panel));
       buildFilaments();
       fadeDir = 1; startTime = performance.now();
       if (!raf) raf = requestAnimationFrame(render);

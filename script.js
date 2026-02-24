@@ -1775,6 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let cometActive = false, cometSX = 0, cometSY = 0, cometT0 = 0;
     let cometEX = 0, cometEY = 0, cometCPX = 0, cometCPY = 0, cometTail = [];
     let fragments = [], shockwaves = [];
+    let fieldActive = false, fieldBloomT0 = 0;
 
     const rnd = (a, b) => Math.random() * (b - a) + a;
 
@@ -1874,7 +1875,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderParticles() {
-      const ic = CFG.ION, eff = intensity || 1;
+      if (!fieldActive) return;
+      const bloomAlpha = Math.min((performance.now() - fieldBloomT0) / 700, 1);
+      const ic = CFG.ION, eff = (intensity || 1) * bloomAlpha;
       ctx.lineCap = 'round';
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
@@ -2012,6 +2015,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (t >= 1) {
         cometActive = false; cometTail = [];
+        fieldActive = true; fieldBloomT0 = performance.now();
         spawnShockwave(hx, hy, CFG.ION); spawnShockwave(hx, hy, CFG.COLORS[2]);
         const now2 = performance.now();
         for (let i = 0; i < CFG.COMET_FRAGS; i++) {
@@ -2137,11 +2141,13 @@ document.addEventListener('DOMContentLoaded', () => {
           const sy = ((workRect.top + workRect.height / 2) - canvasRect.top) * dpr;
           cometSX = sx; cometSY = sy;
           initComet();
+          start();
           cometActive = true; cometT0 = performance.now();
           seedFired = true;
         }
         if (progress < 0.2 && seedFired) {
           seedFired = false; cometActive = false; fragments = []; cometTail = [];
+          fieldActive = false; fieldBloomT0 = 0;
         }
       },
 
@@ -2421,7 +2427,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!srcEl || !panels.length) return;
 
   const COLORS = [[68,221,255],[168,85,247],[204,85,255],[68,136,255]];
-  const MAIN_N = 3, MICRO_N = 2;
+  const MAIN_N = 4, MICRO_N = 2;
 
   const vv = window.visualViewport;
   const getVP = () => vv ? { ox: vv.offsetLeft, oy: vv.offsetTop } : { ox: 0, oy: 0 };
@@ -2454,49 +2460,38 @@ document.addEventListener('DOMContentLoaded', () => {
             (r.top  + r.height * 0.60 - vp.oy) * dpr2];
   }
 
-  // Edge-intersection anchors: strands grab the card face nearest the source
-  function edgeAnchors(srcCX, srcCY, rect, count) {
+  // Tether target: union rect of all child media (fixes multi-tile approach panels)
+  function getTetherRect2(panel) {
+    const media = [...panel.querySelectorAll('video, img')];
+    if (media.length === 0) return panel.getBoundingClientRect();
+    if (media.length === 1) return media[0].getBoundingClientRect();
+    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
+    for (const m of media) {
+      const r = m.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if (r.left   < minL) minL = r.left;
+      if (r.top    < minT) minT = r.top;
+      if (r.right  > maxR) maxR = r.right;
+      if (r.bottom > maxB) maxB = r.bottom;
+    }
+    if (!isFinite(minL)) return panel.getBoundingClientRect();
+    return { left: minL, top: minT, right: maxR, bottom: maxB,
+             width: maxR - minL, height: maxB - minT };
+  }
+
+  // Corner anchors: TL/TR/BR/BL with clamped inset
+  function cornerAnchors2(rect) {
     const vp = getVP();
-    const { left, right, top, bottom, width, height } = rect;
-    const srcVX = srcCX / dpr2 + vp.ox, srcVY = srcCY / dpr2 + vp.oy;
-    const cardCX = left + width * 0.5, cardCY = top + height * 0.5;
-    const ddx = cardCX - srcVX, ddy = cardCY - srcVY;
-    const dlen = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
-    const ux = ddx / dlen, uy = ddy / dlen;
-    const INSET = 5;
-    const hits = [];
-    const tryEdge = (t, x, y, edge) => {
-      if (t > 0 && x >= left - 1 && x <= right + 1 && y >= top - 1 && y <= bottom + 1)
-        hits.push({ t, x, y, edge });
-    };
-    if (Math.abs(ux) > 1e-4) {
-      tryEdge((left  - srcVX) / ux, left,  srcVY + uy * (left  - srcVX) / ux, 'left');
-      tryEdge((right - srcVX) / ux, right, srcVY + uy * (right - srcVX) / ux, 'right');
-    }
-    if (Math.abs(uy) > 1e-4) {
-      tryEdge((top    - srcVY) / uy, srcVX + ux * (top    - srcVY) / uy, top,    'top');
-      tryEdge((bottom - srcVY) / uy, srcVX + ux * (bottom - srcVY) / uy, bottom, 'bottom');
-    }
-    hits.sort((a, b) => a.t - b.t);
-    const hit = hits[0] || { x: cardCX, y: cardCY, edge: 'bottom' };
-    let bx = hit.x, by = hit.y;
-    if (hit.edge === 'left')   bx += INSET;
-    if (hit.edge === 'right')  bx -= INSET;
-    if (hit.edge === 'top')    by += INSET;
-    if (hit.edge === 'bottom') by -= INSET;
-    const tgX = (hit.edge === 'left' || hit.edge === 'right') ? 0 : 1;
-    const tgY = (hit.edge === 'left' || hit.edge === 'right') ? 1 : 0;
-    const eLen = (hit.edge === 'left' || hit.edge === 'right') ? height : width;
-    const spread = eLen * 0.22;
-    const pts = [];
-    for (let i = 0; i < count; i++) {
-      const off = count > 1 ? (i / (count - 1) - 0.5) * 2 * spread : 0;
-      let ax = bx + tgX * off, ay = by + tgY * off;
-      ax = Math.max(left + INSET, Math.min(right - INSET, ax));
-      ay = Math.max(top + INSET, Math.min(bottom - INSET, ay));
-      pts.push([(ax - vp.ox) * dpr2, (ay - vp.oy) * dpr2]);
-    }
-    return pts;
+    const iw = Math.min(4, rect.width  * 0.10);
+    const ih = Math.min(4, rect.height * 0.10);
+    const l = rect.left  + iw, r = rect.right  - iw;
+    const t = rect.top   + ih, b = rect.bottom - ih;
+    return [
+      [(l - vp.ox) * dpr2, (t - vp.oy) * dpr2], // TL
+      [(r - vp.ox) * dpr2, (t - vp.oy) * dpr2], // TR
+      [(r - vp.ox) * dpr2, (b - vp.oy) * dpr2], // BR
+      [(l - vp.ox) * dpr2, (b - vp.oy) * dpr2], // BL
+    ];
   }
 
   function bezPt2(t, x0, y0, cx, cy, x1, y1) {
@@ -2551,6 +2546,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Perimeter wrap: subtle edge strands that grip the card
+  function drawWrapEdges2(elapsed, alpha) {
+    if (anchors2.length < 4) return;
+    const edges = [[anchors2[0], anchors2[1]], [anchors2[1], anchors2[2]],
+                   [anchors2[2], anchors2[3]], [anchors2[3], anchors2[0]]];
+    ctx2.lineCap = 'round';
+    edges.forEach(([p0, p1], i) => {
+      const cx = (p0[0] + p1[0]) / 2 + Math.sin(elapsed * 0.8 + i * 1.5) * 5 * dpr2;
+      const cy = (p0[1] + p1[1]) / 2 + Math.cos(elapsed * 0.6 + i * 1.2) * 5 * dpr2;
+      const c  = COLORS[i % COLORS.length];
+      ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx2.globalAlpha = alpha * 0.13;
+      ctx2.lineWidth   = 2.5 * dpr2;
+      ctx2.beginPath(); ctx2.moveTo(p0[0], p0[1]); ctx2.quadraticCurveTo(cx, cy, p1[0], p1[1]); ctx2.stroke();
+      ctx2.globalAlpha = alpha * 0.22;
+      ctx2.lineWidth   = 0.7 * dpr2;
+      ctx2.beginPath(); ctx2.moveTo(p0[0], p0[1]); ctx2.quadraticCurveTo(cx, cy, p1[0], p1[1]); ctx2.stroke();
+    });
+  }
+
   function renderApproachTether(now) {
     ctx2.globalCompositeOperation = 'source-over'; ctx2.globalAlpha = 1;
     ctx2.clearRect(0, 0, W2, H2);
@@ -2561,6 +2576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fadeAlpha2 > 0 && anchors2.length) {
       ctx2.save();
       for (let i = 0; i < fils2.length; i++) drawFil2(fils2[i], elapsed, fadeAlpha2);
+      drawWrapEdges2(elapsed, fadeAlpha2);
       ctx2.restore();
     }
     for (let i = bursts2.length - 1; i >= 0; i--) {
@@ -2580,7 +2596,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function recompute2() {
     if (!activePanel2) return;
     srcPt2   = getSrcPt();
-    anchors2 = edgeAnchors(srcPt2[0], srcPt2[1], activePanel2.getBoundingClientRect(), MAIN_N + MICRO_N);
+    anchors2 = cornerAnchors2(getTetherRect2(activePanel2));
   }
   let scrollTick2 = 0;
   function scheduleRecompute2() {
@@ -2604,7 +2620,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activePanel2 = panel;
       srcEl.classList.add('tether-headline-active');
       srcPt2   = getSrcPt();
-      anchors2 = edgeAnchors(srcPt2[0], srcPt2[1], panel.getBoundingClientRect(), MAIN_N + MICRO_N);
+      anchors2 = cornerAnchors2(getTetherRect2(panel));
       buildFils2(); fadeDir2 = 1; startTime2 = performance.now();
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
       setTimeout(() => {
