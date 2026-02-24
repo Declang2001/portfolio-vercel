@@ -1764,6 +1764,7 @@ body.services-active .services::before {
 .hero.hero--approach {
   height: 260vh;
   margin-bottom: -8px;
+  background: var(--bg);
 }
 
 /* Match home hero feel */
@@ -1795,7 +1796,7 @@ body.services-active .services::before {
   height: calc(100vh + 200px);
   border-radius: 0;
   overflow: hidden;
-  background: #000;
+  background: var(--bg);
   box-shadow: 0 40px 110px rgba(0, 0, 0, 0.9);
   opacity: 0;
   transform: translate3d(-50%, -50%, 0) scale3d(0.4, 0.4, 1);

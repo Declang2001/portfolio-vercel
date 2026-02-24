@@ -105,13 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (rotatingEl) {
     const words = [
-      'emotion',
-      'story-telling',
-      'tension',
-      'memory',
-      'wonder',
-      'nostalgia',
-      'momentum'
+      'interactive',
+      'motion-led',
+      'story-driven',
+      'campaign-ready',
+      'short-form',
+      'illustrated',
+      'AI-enabled'
     ];
     let idx = 0;
 
@@ -2412,22 +2412,21 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// ── Approach collage: tether filaments from headline → hovered panel ──────────
-// v2.1: edge-intersection anchors, sticky on page+rail scroll, robust selector
+// ── Approach collage: particle conduit from headline + hero → hovered panel ────
+// v3.0: directed particles along bezier beams, hero emitter, always purple
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.body.classList.contains('approach-page')) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!window.matchMedia('(hover: hover)').matches) return;
 
-  // .approach-title is the h2 itself after the headline simplification
   const srcEl = document.querySelector('.approach-title')
               || document.querySelector('.approach-header h2');
   const panels = document.querySelectorAll('#collageStack .collage-panel');
   if (!srcEl || !panels.length) return;
 
-  // Exact value of --accent: #a855f7 from style.css (:root)
   const FALLBACK_PURPLE_RGB2 = [168, 85, 247];
   const MAIN_N = 4, MICRO_N = 2;
+  const PARTICLE_BUDGET = 110;
 
   const vv = window.visualViewport;
   const getVP = () => vv ? { ox: vv.offsetLeft, oy: vv.offsetTop } : { ox: 0, oy: 0 };
@@ -2450,7 +2449,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
   let startTime2 = 0, activePanel2 = null;
-  let srcPts2 = [], srcSeeds2 = [], anchors2 = [], fils2 = [], bursts2 = [];
+  let srcPts2 = [], srcSeeds2 = [], anchors2 = [], beams2 = [], particles2 = [];
+  let heroRect2 = null, heroVisibleFactor2 = 0;
   // Read --accent from :root once; never sample headline text (which is white by default)
   const _accentRaw = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
   const purpleRGB2 = parseColorToRGB2(_accentRaw) || FALLBACK_PURPLE_RGB2.slice();
@@ -2476,8 +2476,8 @@ document.addEventListener('DOMContentLoaded', () => {
     m = s.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
     if (m) {
       const h = m[1];
-      if (h.length === 3) return [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)];
-      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+      if (h.length === 3) return [parseInt(h[0]+h[0],16),parseInt(h[1]+h[1],16),parseInt(h[2]+h[2],16)];
+      return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];
     }
     return null;
   }
@@ -2488,10 +2488,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const t = total <= 1 ? 0.5 : i / (total - 1);
       const nx = 0.15 + t * 0.70 + rnd2(-0.015, 0.015);
       const ny = 0.58 + rnd2(-0.04, 0.04);
-      out.push({
-        nx: Math.max(0.12, Math.min(0.88, nx)),
-        ny: Math.max(0.50, Math.min(0.74, ny)),
-      });
+      out.push({ nx: Math.max(0.12, Math.min(0.88, nx)), ny: Math.max(0.50, Math.min(0.74, ny)) });
     }
     return out;
   }
@@ -2501,23 +2498,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const r = srcEl.getBoundingClientRect();
     const vp = getVP();
     srcPts2 = srcSeeds2.map((s) => [
-      (r.left + r.width * s.nx - vp.ox) * dpr2,
+      (r.left + r.width  * s.nx - vp.ox) * dpr2,
       (r.top  + r.height * s.ny - vp.oy) * dpr2,
     ]);
   }
 
   function detachPanelObserver2() {
-    if (!panelRO2) return;
-    panelRO2.disconnect();
-    panelRO2 = null;
+    if (!panelRO2) return; panelRO2.disconnect(); panelRO2 = null;
   }
 
   function attachPanelObserver2(panel) {
     detachPanelObserver2();
     if (typeof ResizeObserver === 'undefined') return;
-    panelRO2 = new ResizeObserver(() => {
-      if (activePanel2 === panel) scheduleRecompute2();
-    });
+    panelRO2 = new ResizeObserver(() => { if (activePanel2 === panel) scheduleRecompute2(); });
     panelRO2.observe(panel);
   }
 
@@ -2529,11 +2522,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const mX = rect.left + rect.width  * 0.5;
     const mY = rect.top  + rect.height * 0.5;
     return [
-      [(mX              - vp.ox) * dpr2, (rect.top    + ih - vp.oy) * dpr2], // top mid
-      [(rect.right - iw - vp.ox) * dpr2, (mY               - vp.oy) * dpr2], // right mid
-      [(mX              - vp.ox) * dpr2, (rect.bottom - ih - vp.oy) * dpr2], // bottom mid
-      [(rect.left  + iw - vp.ox) * dpr2, (mY               - vp.oy) * dpr2], // left mid
+      [(mX              - vp.ox) * dpr2, (rect.top    + ih - vp.oy) * dpr2],
+      [(rect.right - iw - vp.ox) * dpr2, (mY               - vp.oy) * dpr2],
+      [(mX              - vp.ox) * dpr2, (rect.bottom - ih - vp.oy) * dpr2],
+      [(rect.left  + iw - vp.ox) * dpr2, (mY               - vp.oy) * dpr2],
     ];
+  }
+
+  // Pair source points → anchors sorted by x to minimise visual crossings
+  function buildBeams2() {
+    beams2 = [];
+    if (!srcPts2.length || !anchors2.length) return;
+    const total = MAIN_N + MICRO_N;
+    const sIdxs = [...Array(srcPts2.length).keys()].sort((a, b) => srcPts2[a][0] - srcPts2[b][0]);
+    const aIdxs = [...Array(anchors2.length).keys()].sort((a, b) => anchors2[a][0] - anchors2[b][0]);
+    for (let i = 0; i < total; i++) {
+      beams2.push({ si: sIdxs[i % sIdxs.length], ai: aIdxs[i % aIdxs.length] });
+    }
   }
 
   function bezPt2(t, x0, y0, cx, cy, x1, y1) {
@@ -2541,53 +2546,39 @@ document.addEventListener('DOMContentLoaded', () => {
     return [mt*mt*x0 + 2*mt*t*cx + t*t*x1, mt*mt*y0 + 2*mt*t*cy + t*t*y1];
   }
 
-  function buildFils2() {
-    fils2 = [];
-    const total = MAIN_N + MICRO_N;
-    for (let i = 0; i < total; i++) {
-      const main = i < MAIN_N;
-      fils2.push({
-        ai: i % anchors2.length, si: i % srcSeeds2.length, ci: 0,
-        freq: rnd2(0.5, 1.6), phase: rnd2(0, Math.PI * 2),
-        amp:  rnd2(main ? 18 : 6, main ? 42 : 18) * dpr2,
-        ampY: rnd2(main ? 10 : 4, main ? 25 : 10) * dpr2,
-        alpha: main ? rnd2(0.65, 0.85) : rnd2(0.22, 0.38),
-        lw: main ? rnd2(1.2, 1.8) : rnd2(0.6, 0.9), main,
-        spark: main ? { t: rnd2(0, 1), spd: rnd2(0.004, 0.01), dir: 1 } : null,
-      });
-    }
+  // Update cached hero rect and compute how visible it is (0-1)
+  function updateHeroRect2() {
+    const hw = document.querySelector('.approach-hero-video-wrapper');
+    if (!hw) { heroRect2 = null; heroVisibleFactor2 = 0; return; }
+    heroRect2 = hw.getBoundingClientRect();
+    const viewH = vv ? vv.height : window.innerHeight;
+    const visiblePx = Math.max(0, Math.min(heroRect2.bottom, viewH) - Math.max(heroRect2.top, 0));
+    heroVisibleFactor2 = heroRect2.height > 0 ? Math.min(visiblePx / heroRect2.height, 1) : 0;
   }
 
-  function drawFil2(f, elapsed, alpha) {
-    if (!anchors2[f.ai]) return;
-    const [ax, ay] = anchors2[f.ai];
-    const [sx, sy] = srcPts2[f.si] || srcPts2[0] || [0, 0];
-    const mx = (sx + ax) / 2 + Math.sin(elapsed * f.freq + f.phase) * f.amp;
-    const my = (sy + ay) / 2 + Math.cos(elapsed * f.freq * 0.7 + f.phase) * f.ampY;
-    const c = tetherRGB2;
-    const a = f.alpha * alpha;
-    ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-    if (f.main) {
-      ctx2.globalAlpha = a * 0.22; ctx2.lineWidth = f.lw * dpr2 * 4;
-      ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
+  // Emit one particle: from hero emitter zone or from headline source points
+  function spawnParticle2(fromHero) {
+    if (!srcPts2.length || !anchors2.length) return;
+    const ai = Math.floor(Math.random() * anchors2.length);
+    const [ax, ay] = anchors2[ai];
+    let sx, sy;
+    if (fromHero && heroRect2) {
+      const vp = getVP();
+      sx = (heroRect2.left + Math.random() * heroRect2.width  - vp.ox) * dpr2;
+      sy = (heroRect2.top  + Math.random() * heroRect2.height - vp.oy) * dpr2;
+    } else {
+      const si = Math.floor(Math.random() * srcPts2.length);
+      [sx, sy] = srcPts2[si];
     }
-    ctx2.globalAlpha = a * (f.main ? 0.88 : 0.72); ctx2.lineWidth = f.lw * dpr2;
-    ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
-    if (f.main) {
-      const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3.5 + f.phase);
-      const nr = (1.5 + pulse * 1.5) * dpr2;
-      ctx2.globalAlpha = a * (0.65 + pulse * 0.35);
-      ctx2.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-      ctx2.beginPath(); ctx2.arc(sx, sy, nr, 0, 6.283); ctx2.fill();
-      ctx2.beginPath(); ctx2.arc(ax, ay, nr * 0.85, 0, 6.283); ctx2.fill();
-    }
-    if (f.spark) {
-      f.spark.t += f.spark.spd * f.spark.dir;
-      if (f.spark.t > 1.05 || f.spark.t < -0.05) { f.spark.dir *= -1; f.spark.t = Math.max(0, Math.min(1, f.spark.t)); }
-      const [spx, spy] = bezPt2(f.spark.t, sx, sy, mx, my, ax, ay);
-      ctx2.globalAlpha = a * 0.95; ctx2.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-      ctx2.beginPath(); ctx2.arc(spx, spy, 1.5 * dpr2, 0, 6.283); ctx2.fill();
-    }
+    const midX = (sx + ax) * 0.5 + rnd2(-55, 55) * dpr2;
+    const midY = (sy + ay) * 0.5 + rnd2(-35, 35) * dpr2;
+    particles2.push({
+      x0: sx, y0: sy, cx: midX, cy: midY, x1: ax, y1: ay,
+      t: 0, spd: rnd2(0.006, 0.014),
+      jx: rnd2(-1.5, 1.5) * dpr2, jy: rnd2(-1.5, 1.5) * dpr2,
+      alpha: rnd2(0.55, 0.95),
+      r: rnd2(1.0, 2.0) * dpr2,
+    });
   }
 
   function renderApproachTether(now) {
@@ -2596,31 +2587,76 @@ document.addEventListener('DOMContentLoaded', () => {
     fadeAlpha2 = fadeDir2 > 0 ? Math.min(fadeAlpha2 + 0.07, 1)
                : fadeDir2 < 0 ? Math.max(fadeAlpha2 - 0.06, 0)
                : fadeAlpha2;
-    const elapsed = (now - startTime2) * 0.001;
-    if (fadeAlpha2 > 0 && anchors2.length) {
+
+    if (fadeAlpha2 > 0 && anchors2.length && srcPts2.length) {
+      const [cr, cg, cb] = tetherRGB2;
+      const elapsed = (now - startTime2) * 0.001;
+
+      // Draw faint beam guide paths (breathing beziers)
       ctx2.save();
-      for (let i = 0; i < fils2.length; i++) drawFil2(fils2[i], elapsed, fadeAlpha2);
+      ctx2.strokeStyle = `rgb(${cr},${cg},${cb})`;
+      ctx2.lineWidth = dpr2;
+      for (let i = 0; i < beams2.length; i++) {
+        const bm = beams2[i];
+        const [sx, sy] = srcPts2[bm.si] || srcPts2[0];
+        const [ax, ay] = anchors2[bm.ai] || anchors2[0];
+        const oscX = Math.sin(elapsed * 0.8 + i * 1.1) * 22 * dpr2;
+        const oscY = Math.cos(elapsed * 0.6 + i * 0.9) * 14 * dpr2;
+        const mx = (sx + ax) * 0.5 + oscX;
+        const my = (sy + ay) * 0.5 + oscY;
+        ctx2.globalAlpha = fadeAlpha2 * 0.11;
+        ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
+      }
+      ctx2.restore();
+
+      // Spawn new particles while fading in / stable and under budget
+      if (particles2.length < PARTICLE_BUDGET && fadeDir2 >= 0) {
+        // heroSpawnRatio: lerp(0.1, 0.7, heroVisibleFactor2)
+        const heroSpawnRatio = 0.1 + 0.6 * heroVisibleFactor2;
+        const spawnCount = Math.min(3, PARTICLE_BUDGET - particles2.length);
+        for (let i = 0; i < spawnCount; i++) {
+          spawnParticle2(Math.random() < heroSpawnRatio);
+        }
+      }
+
+      // Update and draw particles
+      ctx2.save();
+      for (let i = particles2.length - 1; i >= 0; i--) {
+        const p = particles2[i];
+        p.t += p.spd;
+        if (p.t >= 1) { particles2.splice(i, 1); continue; }
+        const [bx, by] = bezPt2(p.t, p.x0, p.y0, p.cx, p.cy, p.x1, p.y1);
+        // Jitter fades toward zero as particle approaches the anchor
+        const px = bx + p.jx * (1 - p.t);
+        const py = by + p.jy * (1 - p.t);
+        // Fade in quickly, fade out in the last 15% of travel
+        const fadeIn  = Math.min(p.t * 8, 1);
+        const fadeOut = p.t > 0.85 ? 1 - (p.t - 0.85) / 0.15 : 1;
+        ctx2.globalAlpha = fadeAlpha2 * p.alpha * fadeIn * fadeOut;
+        ctx2.fillStyle = `rgb(${cr},${cg},${cb})`;
+        ctx2.beginPath(); ctx2.arc(px, py, p.r, 0, 6.283); ctx2.fill();
+      }
       ctx2.restore();
     }
-    for (let i = bursts2.length - 1; i >= 0; i--) {
-      const b = bursts2[i]; const age = now - b.st;
-      if (age > b.life) { bursts2.splice(i, 1); continue; }
-      b.x += b.vx; b.y += b.vy; b.vx *= 0.91; b.vy *= 0.91;
-      const c = tetherRGB2;
-      ctx2.globalAlpha = (1 - age / b.life) * 0.9;
-      ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx2.lineWidth = 2 * dpr2;
-      ctx2.beginPath(); ctx2.moveTo(b.x - b.vx * 3, b.y - b.vy * 3); ctx2.lineTo(b.x, b.y); ctx2.stroke();
+
+    // Clean up particles when fully faded out
+    if (fadeAlpha2 <= 0 && fadeDir2 < 0) particles2 = [];
+
+    if (fadeAlpha2 > 0 || particles2.length) {
+      raf2 = requestAnimationFrame(renderApproachTether);
+    } else {
+      raf2 = 0; ctx2.globalAlpha = 1; ctx2.clearRect(0, 0, W2, H2);
     }
-    if (fadeAlpha2 > 0 || bursts2.length) { raf2 = requestAnimationFrame(renderApproachTether); }
-    else { raf2 = 0; ctx2.globalAlpha = 1; ctx2.clearRect(0, 0, W2, H2); }
   }
 
   // Recompute positions on scroll/resize while a panel is active
   function recompute2() {
     if (!activePanel2) return;
     remapSourcePoints2();
+    updateHeroRect2();
     const r = activePanel2.getBoundingClientRect();
     anchors2 = sideAnchors2(r);
+    buildBeams2();
   }
   let scrollTick2 = 0;
   function scheduleRecompute2() {
@@ -2630,7 +2666,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('scroll', scheduleRecompute2, { passive: true });
   window.addEventListener('resize', () => { resize2(); scheduleRecompute2(); }, { passive: true });
-  // Horizontal rail scroll keeps tethers locked to the moving card
+  // Horizontal rail scroll keeps conduit locked to the moving card
   const collageStack2 = document.getElementById('collageStack');
   if (collageStack2) collageStack2.addEventListener('scroll', scheduleRecompute2, { passive: true });
   // iOS visualViewport scroll/resize
@@ -2645,23 +2681,14 @@ document.addEventListener('DOMContentLoaded', () => {
       srcEl.classList.add('tether-headline-active');
       srcSeeds2 = buildSourceSeeds2(MAIN_N + MICRO_N);
       remapSourcePoints2();
+      updateHeroRect2();
       const r2 = panel.getBoundingClientRect();
       anchors2 = sideAnchors2(r2);
+      buildBeams2();
+      particles2 = [];
       attachPanelObserver2(panel);
-      buildFils2(); fadeDir2 = 1; startTime2 = performance.now();
+      fadeDir2 = 1; startTime2 = performance.now();
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
-      setTimeout(() => {
-        const now = performance.now();
-        for (let i = 0; i < MAIN_N; i++) {
-          if (!anchors2[i]) continue;
-          for (let j = 0; j < 5; j++) {
-            const a = Math.random() * Math.PI * 2, spd = rnd2(1, 3) * dpr2;
-            bursts2.push({ x: anchors2[i][0], y: anchors2[i][1],
-                           vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
-                           st: now, life: rnd2(180, 320), ci: 0 });
-          }
-        }
-      }, 120);
     }, { passive: true });
 
     panel.addEventListener('pointerleave', () => {
