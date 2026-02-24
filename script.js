@@ -2450,7 +2450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
   let startTime2 = 0, activePanel2 = null;
-  let srcPt2 = [0, 0], anchors2 = [], fils2 = [], bursts2 = [], strikeCenter2 = [0, 0];
+  let srcPt2 = [0, 0], anchors2 = [], fils2 = [], bursts2 = [];
   const rnd2 = (a, b) => Math.random() * (b - a) + a;
 
   // Source point at 60% down element — hits headline text, not the gap below
@@ -2495,30 +2495,16 @@ document.addEventListener('DOMContentLoaded', () => {
         spark: main ? { t: rnd2(0, 1), spd: rnd2(0.004, 0.01), dir: 1 } : null,
       });
     }
-    // Center strike filament — fast spark, fades to ambient after ~0.5s
-    fils2.push({
-      ci: 0, freq: rnd2(0.3, 0.6), phase: rnd2(0, Math.PI * 2),
-      amp: 18 * dpr2, ampY: 12 * dpr2,
-      alpha: 0.90, lw: 1.5,
-      main: true, strike: true,
-      spark: { t: 0, spd: 0.030, dir: 1 },
-    });
   }
 
   function drawFil2(f, elapsed, alpha) {
-    let ax, ay;
-    if (f.strike) {
-      [ax, ay] = strikeCenter2;
-    } else {
-      if (!anchors2[f.ai]) return;
-      [ax, ay] = anchors2[f.ai];
-    }
+    if (!anchors2[f.ai]) return;
+    const [ax, ay] = anchors2[f.ai];
     const [sx, sy] = srcPt2;
     const mx = (sx + ax) / 2 + Math.sin(elapsed * f.freq + f.phase) * f.amp;
     const my = (sy + ay) / 2 + Math.cos(elapsed * f.freq * 0.7 + f.phase) * f.ampY;
     const c = COLORS[f.ci];
-    const strikeMulti2 = f.strike ? Math.max(0.35, 1.0 - elapsed * 1.8) : 1;
-    const a = f.alpha * alpha * strikeMulti2;
+    const a = f.alpha * alpha;
     ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
     if (f.main) {
       ctx2.globalAlpha = a * 0.22; ctx2.lineWidth = f.lw * dpr2 * 4;
@@ -2574,9 +2560,6 @@ document.addEventListener('DOMContentLoaded', () => {
     srcPt2 = getSrcPt();
     const r = activePanel2.getBoundingClientRect();
     anchors2 = sideAnchors2(r);
-    const vp = getVP();
-    strikeCenter2 = [(r.left + r.width  * 0.5 - vp.ox) * dpr2,
-                     (r.top  + r.height * 0.5 - vp.oy) * dpr2];
   }
   let scrollTick2 = 0;
   function scheduleRecompute2() {
@@ -2602,9 +2585,6 @@ document.addEventListener('DOMContentLoaded', () => {
       srcPt2 = getSrcPt();
       const r2 = panel.getBoundingClientRect();
       anchors2 = sideAnchors2(r2);
-      const vp2 = getVP();
-      strikeCenter2 = [(r2.left + r2.width  * 0.5 - vp2.ox) * dpr2,
-                       (r2.top  + r2.height * 0.5 - vp2.oy) * dpr2];
       buildFils2(); fadeDir2 = 1; startTime2 = performance.now();
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
       setTimeout(() => {
@@ -2623,7 +2603,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     panel.addEventListener('pointerleave', () => {
       if (activePanel2 === panel) {
-        activePanel2 = null; fadeDir2 = -1;
+        activePanel2 = null;
+        fadeDir2 = -1;
         srcEl.classList.remove('tether-headline-active');
       }
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);

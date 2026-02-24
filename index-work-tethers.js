@@ -1,4 +1,4 @@
-// ── Tethers v3: side-midpoint anchors, center strike, scroll-stable ──────────
+// ── Tethers v4: corner anchors, tilt-matrix glued, scroll-stable ──────────────
 // Index page only. Reduced-motion and coarse-pointer aware.
 (() => {
   'use strict';
@@ -40,7 +40,11 @@
   let W = 0, H = 0, dpr = 1;
   let raf = 0, activePanel = null;
   let fadeAlpha = 0, fadeDir = 0, startTime = 0;
-  let srcCenter = [0, 0], anchors = [], filaments = [], bursts = [], strikeCenter = [0, 0];
+  let srcCenter = [0, 0], anchors = [], filaments = [], bursts = [];
+  let tiltEl = null, tiltLocalW = 0, tiltLocalH = 0;
+  let tiltBaseRect = null, tiltOrigin = [0, 0];
+  let lastTiltUpdateAt = 0;
+  let tiltCandidates = [];
 
   const rnd = (a, b) => Math.random() * (b - a) + a;
 
@@ -59,49 +63,130 @@
             (r.top  + r.height * 0.60 - vp.oy) * dpr];
   }
 
-  // ── Tether target: union rect of all child media ──────────────────────────
-  function getTetherRect(panel) {
-    const media = [...panel.querySelectorAll('video, img')];
-    if (media.length === 0) return panel.getBoundingClientRect();
-    if (media.length === 1) return media[0].getBoundingClientRect();
-    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
-    for (const m of media) {
-      const r = m.getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) continue;
-      if (r.left   < minL) minL = r.left;
-      if (r.top    < minT) minT = r.top;
-      if (r.right  > maxR) maxR = r.right;
-      if (r.bottom > maxB) maxB = r.bottom;
-    }
-    if (!isFinite(minL)) return panel.getBoundingClientRect();
-    return { left: minL, top: minT, right: maxR, bottom: maxB,
-             width: maxR - minL, height: maxB - minT };
+  function toCanvas(vx, vy) {
+    const vp = getVP();
+    return [(vx - vp.ox) * dpr, (vy - vp.oy) * dpr];
   }
 
-  // ── Side midpoint anchors: top / right / bottom / left ───────────────────
-  function sideAnchors(rect) {
-    const vp = getVP();
-    const iw = Math.min(3, rect.width  * 0.10);
-    const ih = Math.min(3, rect.height * 0.10);
-    const mX = rect.left + rect.width  * 0.5;
-    const mY = rect.top  + rect.height * 0.5;
-    return [
-      [(mX              - vp.ox) * dpr, (rect.top    + ih - vp.oy) * dpr], // top mid
-      [(rect.right - iw - vp.ox) * dpr, (mY               - vp.oy) * dpr], // right mid
-      [(mX              - vp.ox) * dpr, (rect.bottom - ih - vp.oy) * dpr], // bottom mid
-      [(rect.left  + iw - vp.ox) * dpr, (mY               - vp.oy) * dpr], // left mid
+  function parseOriginToken(tok, ref, axis) {
+    if (!tok) return ref * 0.5;
+    if (tok.endsWith('%')) return (parseFloat(tok) || 0) * 0.01 * ref;
+    if (tok.endsWith('px')) return parseFloat(tok) || 0;
+    if (axis === 'x') {
+      if (tok === 'left') return 0;
+      if (tok === 'center') return ref * 0.5;
+      if (tok === 'right') return ref;
+    } else {
+      if (tok === 'top') return 0;
+      if (tok === 'center') return ref * 0.5;
+      if (tok === 'bottom') return ref;
+    }
+    const n = parseFloat(tok);
+    return Number.isFinite(n) ? n : ref * 0.5;
+  }
+
+  function readOriginPx(el, w, h) {
+    const cs = getComputedStyle(el);
+    const bits = (cs.transformOrigin || '').trim().split(/\s+/);
+    const ox = parseOriginToken(bits[0], w, 'x');
+    const oy = parseOriginToken(bits[1] || bits[0], h, 'y');
+    return [ox, oy];
+  }
+
+  function addCandidate(list, el) {
+    if (!el || list.includes(el)) return;
+    list.push(el);
+  }
+
+  function buildTiltCandidates(panel) {
+    const list = [];
+    addCandidate(list, panel);
+    const kids = panel.children;
+    for (let i = 0; i < kids.length && i < 6; i++) addCandidate(list, kids[i]);
+    const first = panel.firstElementChild;
+    if (first) {
+      addCandidate(list, first);
+      addCandidate(list, first.firstElementChild);
+      addCandidate(list, first.lastElementChild);
+    }
+    return list;
+  }
+
+  function chooseTiltElement(panel, t0, t1) {
+    for (let i = 0; i < tiltCandidates.length; i++) {
+      const el = tiltCandidates[i];
+      const a = t0.get(el) || 'none';
+      const b = t1.get(el) || 'none';
+      if (a !== b) return el;
+    }
+    if ((t1.get(panel) || 'none') !== 'none') return panel;
+    for (let i = 0; i < tiltCandidates.length; i++) {
+      const el = tiltCandidates[i];
+      if ((t1.get(el) || 'none') !== 'none') return el;
+    }
+    return panel;
+  }
+
+  function sampleCandidateTransforms() {
+    const map = new Map();
+    for (let i = 0; i < tiltCandidates.length; i++) {
+      const el = tiltCandidates[i];
+      map.set(el, getComputedStyle(el).transform || 'none');
+    }
+    return map;
+  }
+
+  function primeTiltElement(panel) {
+    tiltCandidates = buildTiltCandidates(panel);
+    const s0 = sampleCandidateTransforms();
+    requestAnimationFrame(() => {
+      if (activePanel !== panel) return;
+      const s1 = sampleCandidateTransforms();
+      tiltEl = chooseTiltElement(panel, s0, s1);
+      refreshTiltCache();
+      updateAnchorsFromTilt();
+    });
+  }
+
+  function refreshTiltCache() {
+    if (!tiltEl) return;
+    tiltLocalW = tiltEl.offsetWidth || 0;
+    tiltLocalH = tiltEl.offsetHeight || 0;
+    tiltBaseRect = tiltEl.getBoundingClientRect();
+    tiltOrigin = readOriginPx(tiltEl, tiltLocalW, tiltLocalH);
+  }
+
+  function projectLocalPoint(localX, localY) {
+    if (!tiltEl || !tiltBaseRect) return null;
+    const tf = getComputedStyle(tiltEl).transform;
+    const m = (!tf || tf === 'none') ? new DOMMatrix() : new DOMMatrix(tf);
+    const ox = tiltOrigin[0], oy = tiltOrigin[1];
+    const p = new DOMPoint(localX - ox, localY - oy, 0, 1).matrixTransform(m);
+    const w = (p.w && Number.isFinite(p.w) && p.w !== 0) ? p.w : 1;
+    return [tiltBaseRect.left + (p.x / w) + ox, tiltBaseRect.top + (p.y / w) + oy];
+  }
+
+  function updateAnchorsFromTilt() {
+    if (!tiltEl || !tiltBaseRect || tiltLocalW <= 0 || tiltLocalH <= 0) return;
+    const inset = 1.5;
+    const localPts = [
+      [inset, inset],                              // top-left
+      [Math.max(inset, tiltLocalW - inset), inset], // top-right
+      [Math.max(inset, tiltLocalW - inset), Math.max(inset, tiltLocalH - inset)], // bottom-right
+      [inset, Math.max(inset, tiltLocalH - inset)], // bottom-left
     ];
+    anchors = localPts.map((pt) => {
+      const projected = projectLocalPoint(pt[0], pt[1]);
+      return projected ? toCanvas(projected[0], projected[1]) : [0, 0];
+    });
   }
 
   // ── Recompute on scroll/resize while hovering ─────────────────────────────
   function recomputeRects() {
     if (!activePanel) return;
     srcCenter = computeSrcCenter();
-    const r = getTetherRect(activePanel);
-    anchors = sideAnchors(r);
-    const vp = getVP();
-    strikeCenter = [(r.left + r.width  * 0.5 - vp.ox) * dpr,
-                    (r.top  + r.height * 0.5 - vp.oy) * dpr];
+    refreshTiltCache();
+    updateAnchorsFromTilt();
   }
   let scrollTick = 0;
   const scheduleRecompute = () => {
@@ -140,31 +225,17 @@
         spark: isMain ? { t: rnd(0, 1), spd: rnd(0.004, 0.010), dir: 1 } : null,
       });
     }
-    // Center strike filament — fast spark, fades to ambient after ~0.5s
-    filaments.push({
-      ci: 0, freq: rnd(0.3, 0.6), phase: rnd(0, Math.PI * 2),
-      amp: 18 * dpr, ampY: 12 * dpr,
-      alpha: 0.90, lw: 1.5,
-      main: true, strike: true,
-      spark: { t: 0, spd: 0.030, dir: 1 },
-    });
   }
 
   // ── Render one filament ──────────────────────────────────────────────────
   function drawFilament(f, elapsed, alpha) {
-    let ax, ay;
-    if (f.strike) {
-      [ax, ay] = strikeCenter;
-    } else {
-      if (!anchors[f.ai]) return;
-      [ax, ay] = anchors[f.ai];
-    }
+    if (!anchors[f.ai]) return;
+    const [ax, ay] = anchors[f.ai];
     const [sx, sy] = srcCenter;
     const mx = (sx + ax) / 2 + Math.sin(elapsed * f.freq + f.phase) * f.amp;
     const my = (sy + ay) / 2 + Math.cos(elapsed * f.freq * 0.7 + f.phase) * f.ampY;
     const c = COLORS[f.ci];
-    const strikeMulti = f.strike ? Math.max(0.35, 1.0 - elapsed * 1.8) : 1;
-    const a = f.alpha * alpha * strikeMulti;
+    const a = f.alpha * alpha;
     ctx.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
     if (f.main) {
       ctx.globalAlpha = a * 0.22; ctx.lineWidth = f.lw * dpr * 4;
@@ -210,6 +281,10 @@
       : fadeDir < 0
         ? Math.max(fadeAlpha - 0.06, 0)
         : fadeAlpha;
+    if (activePanel && now - lastTiltUpdateAt >= 33) {
+      lastTiltUpdateAt = now;
+      updateAnchorsFromTilt();
+    }
     const elapsed = (now - startTime) * 0.001;
     if (fadeAlpha > 0 && anchors.length > 0) {
       ctx.save();
@@ -241,20 +316,31 @@
   panels.forEach((panel) => {
     panel.addEventListener('pointerenter', () => {
       activePanel = panel;
+      tiltEl = panel;
+      lastTiltUpdateAt = 0;
+      refreshTiltCache();
       srcCenter = computeSrcCenter();
-      const r = getTetherRect(panel);
-      anchors = sideAnchors(r);
-      const vp = getVP();
-      strikeCenter = [(r.left + r.width  * 0.5 - vp.ox) * dpr,
-                      (r.top  + r.height * 0.5 - vp.oy) * dpr];
+      updateAnchorsFromTilt();
+      primeTiltElement(panel);
       buildFilaments();
       fadeDir = 1; startTime = performance.now();
       if (!raf) raf = requestAnimationFrame(render);
       setTimeout(fireArrivalBursts, 120);
     }, { passive: true });
 
+    panel.addEventListener('pointermove', () => {
+      if (activePanel !== panel) return;
+      updateAnchorsFromTilt();
+    }, { passive: true });
+
     panel.addEventListener('pointerleave', () => {
-      if (activePanel === panel) { activePanel = null; fadeDir = -1; }
+      if (activePanel === panel) {
+        activePanel = null;
+        tiltEl = null;
+        tiltBaseRect = null;
+        tiltCandidates = [];
+        fadeDir = -1;
+      }
       if (!raf) raf = requestAnimationFrame(render);
     }, { passive: true });
   });
