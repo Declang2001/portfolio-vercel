@@ -18,35 +18,41 @@
       z-index: 0;
     }
 
-    /* Controls bar */
+    /* Controls bar — bottom-center pill */
     .journey-controls {
       position: fixed;
-      top: calc(var(--header-height, 64px) + 1rem);
-      right: 1.5rem;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 100;
       display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      max-width: calc(100vw - 3rem);
+      gap: 0.25rem;
+      align-items: center;
+      background: rgba(6,6,12,0.82);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 999px;
+      padding: 0.3rem;
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+      max-width: calc(100vw - 2rem);
     }
     .journey-ctrl-btn {
-      border: 1px solid rgba(255,255,255,0.18);
+      border: none;
       border-radius: 999px;
-      background: rgba(10,10,15,0.75);
-      color: rgba(255,255,255,0.65);
-      font-size: 0.72rem;
-      letter-spacing: 0.13em;
-      padding: 0.38rem 0.85rem;
+      background: transparent;
+      color: rgba(255,255,255,0.70);
+      font-size: 0.88rem;
+      letter-spacing: 0.10em;
+      padding: 0.85rem 1.4rem;
+      min-height: 44px;
       cursor: pointer;
       text-transform: lowercase;
-      transition: border-color 0.2s, color 0.2s;
-      -webkit-backdrop-filter: blur(6px);
-      backdrop-filter: blur(6px);
+      transition: background 0.2s, color 0.2s;
+      white-space: nowrap;
     }
     .journey-ctrl-btn:hover,
     .journey-ctrl-btn:focus-visible {
-      border-color: rgba(168,85,247,0.6);
+      background: rgba(168,85,247,0.20);
       color: #fff;
       outline: none;
     }
@@ -55,41 +61,41 @@
     .journey-card {
       position: fixed;
       z-index: 20;
-      background: rgba(8,8,14,0.94);
-      border: 1px solid rgba(168,85,247,0.3);
-      border-radius: 18px;
-      padding: 1.1rem 1.4rem;
-      width: 270px;
+      background: rgba(8,8,14,0.93);
+      border: 1px solid rgba(168,85,247,0.28);
+      border-radius: 20px;
+      padding: 1.6rem 2rem;
+      width: clamp(300px, 70vw, 520px);
       pointer-events: auto;
       opacity: 0;
-      transform: translateY(10px) scale(0.96);
-      transition: opacity 0.28s ease, transform 0.28s ease;
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
+      transform: translateY(12px) scale(0.96);
+      transition: opacity 0.32s ease, transform 0.32s ease;
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
     }
     .journey-card.is-visible {
       opacity: 1;
       transform: translateY(0) scale(1);
     }
     .journey-card-year {
-      font-size: 0.67rem;
-      letter-spacing: 0.15em;
+      font-size: 0.76rem;
+      letter-spacing: 0.18em;
       color: var(--accent, rgb(168,85,247));
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.45rem;
       text-transform: uppercase;
     }
     .journey-card-title {
-      font-size: 1rem;
+      font-size: 1.3rem;
       font-weight: 700;
       color: #fff;
-      margin-bottom: 0.4rem;
-      line-height: 1.3;
+      margin-bottom: 0.5rem;
+      line-height: 1.25;
     }
     .journey-card-line {
-      font-size: 0.8rem;
+      font-size: 0.92rem;
       color: rgba(255,255,255,0.65);
-      line-height: 1.55;
-      margin-bottom: 0.75rem;
+      line-height: 1.70;
+      margin-bottom: 0.85rem;
     }
     .journey-card-tags {
       display: flex;
@@ -97,12 +103,12 @@
       gap: 0.3rem;
     }
     .journey-card-tag {
-      font-size: 0.64rem;
+      font-size: 0.66rem;
       letter-spacing: 0.09em;
-      padding: 0.18rem 0.45rem;
+      padding: 0.20rem 0.55rem;
       border: 1px solid rgba(168,85,247,0.38);
       border-radius: 999px;
-      color: rgba(168,85,247,0.8);
+      color: rgba(168,85,247,0.80);
     }
 
     /* Resume mode */
@@ -255,8 +261,8 @@
     @media (max-width: 600px) {
       .journey-strengths { grid-template-columns: 1fr; }
       .journey-resume, .journey-highlights { padding-left: 1.25rem; padding-right: 1.25rem; }
-      .journey-controls { top: calc(var(--header-height, 64px) + 0.6rem); right: 0.75rem; }
-      .journey-ctrl-btn { font-size: 0.68rem; padding: 0.32rem 0.65rem; }
+      .journey-ctrl-btn { font-size: 0.80rem; padding: 0.75rem 1.05rem; }
+      .journey-card { width: clamp(280px, 90vw, 400px); }
     }
 
     @media (prefers-reduced-motion: reduce) {

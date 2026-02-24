@@ -3045,7 +3045,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // ── Milestone data ──────────────────────────────────────────────────────────
   const MILESTONES = [
     { year: 'Los Angeles', title: 'West Coast Origins',
       oneLine: 'Grew up surrounded by visual culture, music, and street art in LA.',
@@ -3070,452 +3069,398 @@ document.addEventListener('DOMContentLoaded', () => {
       tags: ['interactive', 'motion', 'design tech'], triggerZ: 1120 },
   ];
 
-  // ── DOM refs ────────────────────────────────────────────────────────────────
-  const cvs        = document.getElementById('journeyCanvas');
-  const cardEl     = document.getElementById('journeyCard');
-  const cardYear   = document.getElementById('jCardYear');
-  const cardTitle  = document.getElementById('jCardTitle');
-  const cardLine   = document.getElementById('jCardLine');
-  const cardTags   = document.getElementById('jCardTags');
-  const resumeEl   = document.getElementById('journeyResume');
-  const timelineEl = document.getElementById('journeyTimeline');
+  const cvs       = document.getElementById('journeyCanvas');
+  const cardEl    = document.getElementById('journeyCard');
+  const cardYear  = document.getElementById('jCardYear');
+  const cardTitle = document.getElementById('jCardTitle');
+  const cardLine  = document.getElementById('jCardLine');
+  const cardTags  = document.getElementById('jCardTags');
+  const resumeEl  = document.getElementById('journeyResume');
+  const timelineEl= document.getElementById('journeyTimeline');
   const highlightsEl = document.getElementById('journeyHighlights');
-  const skipBtn    = document.getElementById('jSkip');
-  const resumeBtn  = document.getElementById('jResume');
-  const replayBtn  = document.getElementById('jReplay');
+  const skipBtn   = document.getElementById('jSkip');
+  const resumeBtn = document.getElementById('jResume');
+  const replayBtn = document.getElementById('jReplay');
   if (!cvs) return;
 
   const ctx = cvs.getContext('2d');
   let W = 0, H = 0, cx = 0, cy = 0, dpr = 1;
-  let raf = 0;
-  let lastT = 0;
-  let elapsed = 0;
-  let isTunnelMode = !reduced;
-  let done = false;
+  let raf = 0, lastT = 0, elapsed = 0;
+  let isTunnelMode = !reduced, done = false;
 
-  // ── Tunnel constants ────────────────────────────────────────────────────────
-  const FOV      = 500;
-  const NEAR     = 14;
-  const FAR      = 1800;
-  const SPEED    = 65;
-  const END_Z    = 1300;
-  const CARD_DUR = 1900;
-  let R_TUNNEL   = 300;
-  let NUM_SPARKS = 140;
+  const FOV = 500, NEAR = 14, FAR = 1800, SPEED = 65, END_Z = 1300, CARD_DUR = 3400;
+  let R_TUNNEL = 300, NUM_DUST = 180;
 
-  // ── Tunnel state ────────────────────────────────────────────────────────────
-  let cameraZ    = 0;
-  let rings      = [];
-  let streaks    = [];
-  let sparks     = [];
-  let pulseRings = [];
-  let msDone     = [];
-  let cardTimer  = 0;
-  let boostEnd   = 0;
-  let boostMul   = 1;
+  let cameraZ = 0, rings = [], streaks = [], dust = [], pulseRings = [], msDone = [];
+  let cardTimer = 0, cardSlowEnd = 0, boostEnd = 0, boostMul = 1, bloomStart = 0;
+  let noiseCvs = null, noisePat = null;
 
-  const NUM_RINGS   = 28;
-  const NUM_STREAKS = 60;
+  const NUM_RINGS = 28, NUM_STREAKS = 55;
 
-  // ── Factories ───────────────────────────────────────────────────────────────
   function makeRing(z) {
-    return {
-      z:     z,
-      rFrac: 0.88 + Math.random() * 0.24,
-      alpha: 0.08 + Math.random() * 0.10,
-      seg:   Math.random() < 0.28,
-      phase: Math.random() * Math.PI * 2,
-    };
+    return { z, rFrac: 0.88 + Math.random()*0.24, alpha: 0.08 + Math.random()*0.10,
+             seg: Math.random() < 0.28, phase: Math.random()*Math.PI*2,
+             wobble: Math.random()*0.055, wfreq: 0.7 + Math.random()*1.3 };
   }
-
   function makeStreak() {
-    return {
-      angle: Math.random() * Math.PI * 2,
-      frac:  Math.random() * 1.15,
-      z:     cameraZ + NEAR + Math.random() * (FAR - NEAR),
-    };
+    return { angle: Math.random()*Math.PI*2, frac: Math.random()*1.15,
+             z: cameraZ + NEAR + Math.random()*(FAR-NEAR) };
   }
-
-  function makeSpark() {
-    return {
-      angle:  Math.random() * Math.PI * 2,
-      frac:   0.6 + Math.random() * 0.55,
-      z:      cameraZ + NEAR + Math.random() * (FAR * 0.7),
-      purple: Math.random() < 0.55,
-    };
+  function makeDust() {
+    var layer = Math.random() < 0.35 ? 0 : Math.random() < 0.55 ? 1 : 2;
+    var frac  = Math.random() < 0.22 ? Math.random()*0.32 : 0.5 + Math.random()*0.65;
+    var zRange = layer === 0 ? FAR*0.45 : layer === 1 ? FAR*0.75 : FAR;
+    return { angle: Math.random()*Math.PI*2, frac, layer, purple: Math.random()<0.52,
+             size: 0.4 + Math.random()*0.9, z: cameraZ + NEAR + Math.random()*zRange };
   }
-
   function makePulseRing(now) {
-    return {
-      startT: now,
-      dur:    460 + Math.random() * 240,
-      rFrac:  0.6 + Math.random() * 0.6,
-    };
+    return { startT: now, dur: 460 + Math.random()*280, rFrac: 0.5 + Math.random()*0.7 };
   }
 
-  // ── initTunnel ──────────────────────────────────────────────────────────────
+  function buildNoiseTex() {
+    noiseCvs = document.createElement('canvas');
+    noiseCvs.width = noiseCvs.height = 256;
+    var nc = noiseCvs.getContext('2d');
+    var imgd = nc.createImageData(256, 256);
+    var d = imgd.data, i;
+    for (i = 0; i < d.length; i += 4) {
+      if (Math.random() < 0.055) {
+        var p = Math.random() < 0.6;
+        d[i]   = p ? 148 + Math.floor(Math.random()*70) : 215 + Math.floor(Math.random()*40);
+        d[i+1] = p ? 45  + Math.floor(Math.random()*70) : 180 + Math.floor(Math.random()*45);
+        d[i+2] = p ? 220 + Math.floor(Math.random()*35) : 255;
+        d[i+3] = 15 + Math.floor(Math.random()*65);
+      }
+    }
+    nc.putImageData(imgd, 0, 0);
+    noisePat = ctx.createPattern(noiseCvs, 'repeat');
+  }
+
   function initTunnel() {
-    cameraZ    = 0;
-    elapsed    = 0;
-    lastT      = 0;
-    msDone     = MILESTONES.map(function() { return false; });
-    cardTimer  = 0;
-    boostEnd   = 0;
-    boostMul   = 1;
-    rings      = [];
-    streaks    = [];
-    sparks     = [];
-    pulseRings = [];
+    cameraZ = 0; elapsed = 0; lastT = 0;
+    msDone = MILESTONES.map(function() { return false; });
+    cardTimer = 0; cardSlowEnd = 0; boostEnd = 0; boostMul = 1; bloomStart = 0;
+    rings = []; streaks = []; dust = []; pulseRings = [];
     var i;
-    for (i = 0; i < NUM_RINGS;   i++) { rings.push(makeRing(NEAR + (i / NUM_RINGS) * (FAR - NEAR))); }
-    for (i = 0; i < NUM_STREAKS; i++) { streaks.push(makeStreak()); }
-    for (i = 0; i < NUM_SPARKS;  i++) { sparks.push(makeSpark()); }
+    for (i = 0; i < NUM_RINGS;   i++) rings.push(makeRing(NEAR + (i/NUM_RINGS)*(FAR-NEAR)));
+    for (i = 0; i < NUM_STREAKS; i++) streaks.push(makeStreak());
+    for (i = 0; i < NUM_DUST;    i++) dust.push(makeDust());
   }
 
-  // ── buildTimeline ───────────────────────────────────────────────────────────
   function buildTimeline() {
     timelineEl.innerHTML = '';
     MILESTONES.forEach(function(m) {
       var li = document.createElement('li');
       li.className = 'journey-timeline-item';
-      li.innerHTML =
-        '<div class="journey-timeline-year">' + m.year + '</div>' +
-        '<div class="journey-timeline-title">' + m.title + '</div>' +
-        '<div class="journey-timeline-desc">' + m.oneLine + '</div>' +
-        '<div class="journey-timeline-tags">' +
-          m.tags.map(function(t) { return '<span class="journey-timeline-tag">' + t + '</span>'; }).join('') +
+      li.innerHTML = '<div class="journey-timeline-year">'+m.year+'</div>'+
+        '<div class="journey-timeline-title">'+m.title+'</div>'+
+        '<div class="journey-timeline-desc">'+m.oneLine+'</div>'+
+        '<div class="journey-timeline-tags">'+
+        m.tags.map(function(t){return '<span class="journey-timeline-tag">'+t+'</span>';}).join('')+
         '</div>';
       timelineEl.appendChild(li);
     });
   }
 
-  // ── resize ──────────────────────────────────────────────────────────────────
   function resize() {
-    dpr        = Math.min(window.devicePixelRatio || 1, 2);
-    W          = Math.round(window.innerWidth  * dpr);
-    H          = Math.round(window.innerHeight * dpr);
-    cx         = W * 0.5;
-    cy         = H * 0.5;
-    R_TUNNEL   = H * 0.16;
-    NUM_SPARKS = dpr <= 1 ? 130 : 170;
-    cvs.width  = W;
-    cvs.height = H;
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    W = Math.round(window.innerWidth*dpr);
+    H = Math.round(window.innerHeight*dpr);
+    cx = W*0.5; cy = H*0.5;
+    R_TUNNEL = H*0.16;
+    NUM_DUST = dpr <= 1 ? 160 : 220;
+    cvs.width = W; cvs.height = H;
   }
 
-  // ── showCard / hideCard ─────────────────────────────────────────────────────
   function showCard(m) {
     cardYear.textContent  = m.year;
     cardTitle.textContent = m.title;
     cardLine.textContent  = m.oneLine;
-    cardTags.innerHTML    = m.tags.map(function(t) {
-      return '<span class="journey-card-tag">' + t + '</span>';
-    }).join('');
-    var cw = cardEl.offsetWidth  || 270;
-    var ch = cardEl.offsetHeight || 130;
-    var vw = W / dpr;
-    var vh = H / dpr;
-    cardEl.style.left = Math.round((vw - cw) * 0.5) + 'px';
-    cardEl.style.top  = Math.round(vh * 0.44 - ch * 0.5) + 'px';
+    cardTags.innerHTML = m.tags.map(function(t){
+      return '<span class="journey-card-tag">'+t+'</span>';}).join('');
+    var cw = cardEl.offsetWidth  || 400;
+    var ch = cardEl.offsetHeight || 160;
+    var vw = W/dpr, vh = H/dpr;
+    cardEl.style.left = Math.round((vw - cw)*0.5)+'px';
+    cardEl.style.top  = Math.round(vh*0.40 - ch*0.5)+'px';
     cardEl.classList.add('is-visible');
   }
+  function hideCard() { cardEl.classList.remove('is-visible'); cardTimer = 0; }
 
-  function hideCard() {
-    cardEl.classList.remove('is-visible');
-    cardTimer = 0;
-  }
-
-  // ── Mode switching ──────────────────────────────────────────────────────────
   function showResumeMode() {
-    isTunnelMode = false;
-    cancelAnim();
-    cvs.style.transition = 'opacity 0.25s ease';
-    cvs.style.opacity    = '0';
-    setTimeout(function() { cvs.hidden = true; }, 300);
+    isTunnelMode = false; cancelAnim();
+    cvs.style.transition = 'opacity 0.25s ease'; cvs.style.opacity = '0';
+    setTimeout(function(){ cvs.hidden = true; }, 300);
     hideCard();
-    resumeEl.hidden     = false;
-    highlightsEl.hidden = false;
-    var scrollTarget = (resumeEl.offsetTop || 0) - 80;
+    resumeEl.hidden = false; highlightsEl.hidden = false;
+    var scrollTarget = (resumeEl.offsetTop||0) - 80;
     window.scrollTo(0, Math.max(0, scrollTarget));
     if (resumeBtn) resumeBtn.textContent = 'tunnel run';
-    if (skipBtn)   skipBtn.hidden  = true;
+    if (skipBtn)   skipBtn.hidden = true;
     if (replayBtn && !reduced) replayBtn.hidden = false;
   }
-
   function showTunnelMode() {
     isTunnelMode = true;
-    resumeEl.hidden     = true;
-    highlightsEl.hidden = true;
-    cvs.hidden = false;
-    cvs.style.transition = '';
-    cvs.style.opacity    = '1';
-    hideCard();
-    done = false;
+    resumeEl.hidden = true; highlightsEl.hidden = true;
+    cvs.hidden = false; cvs.style.transition = ''; cvs.style.opacity = '1';
+    hideCard(); done = false;
     if (resumeBtn) resumeBtn.textContent = 'resume mode';
-    if (skipBtn)   skipBtn.hidden  = false;
+    if (skipBtn)   skipBtn.hidden = false;
     if (replayBtn) replayBtn.hidden = true;
-    initTunnel();
-    startAnim();
+    initTunnel(); startAnim();
   }
+  function endAnimation() { done = true; showResumeMode(); }
+  function cancelAnim() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+  function startAnim()  { cancelAnim(); raf = requestAnimationFrame(loop); }
 
-  function endAnimation() {
-    done = true;
-    showResumeMode();
-  }
-
-  function cancelAnim() {
-    if (raf) { cancelAnimationFrame(raf); raf = 0; }
-  }
-
-  function startAnim() {
-    cancelAnim();
-    raf = requestAnimationFrame(loop);
-  }
-
-  // ── Milestone pulse ─────────────────────────────────────────────────────────
   function triggerPulse(now) {
-    var p, sp;
-    for (p = 0; p < 8; p++) { pulseRings.push(makePulseRing(now)); }
-    for (p = 0; p < 15; p++) {
-      sp   = makeSpark();
-      sp.z = cameraZ + NEAR + Math.random() * 80;
-      sparks.push(sp);
+    var p, dp;
+    for (p = 0; p < 12; p++) pulseRings.push(makePulseRing(now));
+    for (p = 0; p < 20; p++) {
+      dp = makeDust(); dp.z = cameraZ + NEAR + Math.random()*70; dp.layer = 0;
+      dust.push(dp);
     }
-    if (sparks.length > NUM_SPARKS + 35) { sparks.splice(0, sparks.length - (NUM_SPARKS + 35)); }
+    if (dust.length > NUM_DUST + 45) dust.splice(0, dust.length - (NUM_DUST+45));
+    bloomStart = now;
   }
 
-  // ── drawHaze ────────────────────────────────────────────────────────────────
+  function drawBloom(now) {
+    if (!bloomStart) return;
+    var t = (now - bloomStart) / 360;
+    if (t >= 1) { bloomStart = 0; return; }
+    var alpha = 0.16*(1-t)*(1-t);
+    var r = R_TUNNEL*(FOV/55)*(0.3 + t*0.7);
+    var grd = ctx.createRadialGradient(cx,cy,0, cx,cy,r);
+    grd.addColorStop(0,    'rgba(210,170,255,'+alpha.toFixed(4)+')');
+    grd.addColorStop(0.35, 'rgba(168,85,247,'+(alpha*0.45).toFixed(4)+')');
+    grd.addColorStop(1,    'rgba(0,0,0,0)');
+    ctx.globalAlpha = 1; ctx.fillStyle = grd; ctx.fillRect(0,0,W,H);
+  }
+
   function drawHaze() {
-    var r   = R_TUNNEL * (FOV / 180);
-    var grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    grd.addColorStop(0,   'rgba(168,85,247,0.032)');
-    grd.addColorStop(0.5, 'rgba(110,35,190,0.015)');
-    grd.addColorStop(1,   'rgba(0,0,0,0)');
-    ctx.globalAlpha = 1;
-    ctx.fillStyle   = grd;
-    ctx.fillRect(0, 0, W, H);
+    var r = R_TUNNEL*(FOV/155);
+    var grd = ctx.createRadialGradient(cx,cy,0, cx,cy,r);
+    grd.addColorStop(0,    'rgba(168,85,247,0.050)');
+    grd.addColorStop(0.45, 'rgba(110,35,190,0.024)');
+    grd.addColorStop(1,    'rgba(0,0,0,0)');
+    ctx.globalAlpha = 1; ctx.fillStyle = grd; ctx.fillRect(0,0,W,H);
+    var driftX = Math.sin(elapsed*0.19)*W*0.045;
+    var driftY = Math.cos(elapsed*0.14)*H*0.032;
+    var r2 = Math.max(W,H)*0.7;
+    var grd2 = ctx.createRadialGradient(cx+driftX,cy+driftY,0, cx+driftX,cy+driftY,r2);
+    grd2.addColorStop(0,    'rgba(75,18,155,0.022)');
+    grd2.addColorStop(0.55, 'rgba(35,8,90,0.010)');
+    grd2.addColorStop(1,    'rgba(0,0,0,0)');
+    ctx.fillStyle = grd2; ctx.fillRect(0,0,W,H);
+    if (noisePat) {
+      var ox = (elapsed*7) % 256;
+      var oy = (elapsed*4.5) % 256;
+      ctx.save(); ctx.globalAlpha = 0.055;
+      ctx.translate(ox, oy); ctx.fillStyle = noisePat;
+      ctx.fillRect(-ox,-oy, W+256, H+256);
+      ctx.restore();
+    }
   }
 
-  // ── drawRing (2-pass glow + bright edge) ────────────────────────────────────
   function drawRing(ring) {
     var relZ = ring.z - cameraZ;
     if (relZ < NEAR || relZ > FAR) return;
-    var scale   = FOV / relZ;
-    var screenR = ring.rFrac * R_TUNNEL * scale;
+    var scale   = FOV/relZ;
+    var wobbled = 1 + ring.wobble*Math.sin(elapsed*ring.wfreq + ring.phase);
+    var screenR = ring.rFrac*R_TUNNEL*scale*wobbled;
     if (screenR < 2) return;
-    var fade = Math.min(1, (relZ - NEAR) / 80) * Math.min(1, (FAR - relZ) / 400);
-    var rot  = ring.phase + elapsed * 0.04;
+    var fade = Math.min(1,(relZ-NEAR)/80)*Math.min(1,(FAR-relZ)/400);
+    var rot  = ring.phase + elapsed*0.04;
     var i, a0, a1, steps;
-
     if (ring.seg) {
       steps = 28;
-      // Pass 1 — glow arcs
-      ctx.globalAlpha = ring.alpha * 0.55 * fade;
+      ctx.globalAlpha = ring.alpha*0.55*fade;
       ctx.strokeStyle = 'rgba(168,85,247,1)';
-      ctx.lineWidth   = Math.max(1.5, 4 * scale);
+      ctx.lineWidth   = Math.max(1.5, 4*scale);
       ctx.beginPath();
-      for (i = 0; i < steps; i += 2) {
-        a0 = (i / steps) * Math.PI * 2;
-        a1 = ((i + 0.72) / steps) * Math.PI * 2;
-        ctx.moveTo(cx + Math.cos(a0) * screenR, cy + Math.sin(a0) * screenR);
-        ctx.arc(cx, cy, screenR, a0, a1);
+      for (i=0; i<steps; i+=2) {
+        a0 = (i/steps)*Math.PI*2; a1 = ((i+0.72)/steps)*Math.PI*2;
+        ctx.moveTo(cx+Math.cos(a0)*screenR, cy+Math.sin(a0)*screenR);
+        ctx.arc(cx,cy,screenR,a0,a1);
       }
       ctx.stroke();
-      // Pass 2 — bright edge
-      ctx.globalAlpha = ring.alpha * 1.7 * fade;
+      ctx.globalAlpha = ring.alpha*1.7*fade;
       ctx.strokeStyle = 'rgba(210,155,255,1)';
-      ctx.lineWidth   = Math.max(0.5, 1.1 * scale);
+      ctx.lineWidth   = Math.max(0.5, 1.1*scale);
       ctx.beginPath();
-      for (i = 0; i < steps; i += 2) {
-        a0 = (i / steps) * Math.PI * 2;
-        a1 = ((i + 0.72) / steps) * Math.PI * 2;
-        ctx.moveTo(cx + Math.cos(a0) * screenR, cy + Math.sin(a0) * screenR);
-        ctx.arc(cx, cy, screenR, a0, a1);
+      for (i=0; i<steps; i+=2) {
+        a0 = (i/steps)*Math.PI*2; a1 = ((i+0.72)/steps)*Math.PI*2;
+        ctx.moveTo(cx+Math.cos(a0)*screenR, cy+Math.sin(a0)*screenR);
+        ctx.arc(cx,cy,screenR,a0,a1);
       }
       ctx.stroke();
     } else {
-      // Pass 1 — glow ellipse
-      ctx.globalAlpha = ring.alpha * 0.55 * fade;
+      ctx.globalAlpha = ring.alpha*0.55*fade;
       ctx.strokeStyle = 'rgba(168,85,247,1)';
-      ctx.lineWidth   = Math.max(1.5, 4 * scale);
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, screenR, screenR * 0.6, rot, 0, Math.PI * 2);
-      ctx.stroke();
-      // Pass 2 — bright edge
-      ctx.globalAlpha = ring.alpha * 1.7 * fade;
+      ctx.lineWidth   = Math.max(1.5, 4*scale);
+      ctx.beginPath(); ctx.ellipse(cx,cy,screenR,screenR*0.6,rot,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = ring.alpha*1.7*fade;
       ctx.strokeStyle = 'rgba(210,155,255,1)';
-      ctx.lineWidth   = Math.max(0.5, 1.1 * scale);
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, screenR, screenR * 0.6, rot, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.lineWidth   = Math.max(0.5, 1.1*scale);
+      ctx.beginPath(); ctx.ellipse(cx,cy,screenR,screenR*0.6,rot,0,Math.PI*2); ctx.stroke();
     }
   }
 
-  // ── drawStreak ──────────────────────────────────────────────────────────────
   function drawStreak(streak, spd, dt) {
     var relZ = streak.z - cameraZ;
     if (relZ < NEAR || relZ > FAR) return;
-    var s0 = FOV / (relZ + spd * dt);
-    var s1 = FOV / relZ;
-    var wx = Math.cos(streak.angle) * streak.frac * R_TUNNEL;
-    var wy = Math.sin(streak.angle) * streak.frac * R_TUNNEL;
-    var fadeNear = Math.min(1, (relZ - NEAR) / 30);
-    ctx.globalAlpha = (0.15 + 0.28 * Math.min(1, spd * dt * 10 / relZ)) * fadeNear;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth   = Math.max(0.4, 0.9 * s1);
-    ctx.beginPath();
-    ctx.moveTo(cx + wx * s0, cy + wy * s0);
-    ctx.lineTo(cx + wx * s1, cy + wy * s1);
-    ctx.stroke();
+    var s0 = FOV/(relZ + spd*dt), s1 = FOV/relZ;
+    var wx = Math.cos(streak.angle)*streak.frac*R_TUNNEL;
+    var wy = Math.sin(streak.angle)*streak.frac*R_TUNNEL;
+    var fadeNear = Math.min(1,(relZ-NEAR)/30);
+    ctx.globalAlpha = (0.14 + 0.26*Math.min(1,spd*dt*10/relZ))*fadeNear;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(0.4, 0.9*s1);
+    ctx.beginPath(); ctx.moveTo(cx+wx*s0,cy+wy*s0); ctx.lineTo(cx+wx*s1,cy+wy*s1); ctx.stroke();
   }
 
-  // ── drawSpark ───────────────────────────────────────────────────────────────
-  function drawSpark(spark, spd, dt) {
-    var relZ = spark.z - cameraZ;
+  function drawDust(dp, spd, dt) {
+    var relZ = dp.z - cameraZ;
     if (relZ < NEAR || relZ > FAR) return;
-    var s1  = FOV / relZ;
-    var s0  = FOV / Math.max(NEAR + 1, relZ + spd * dt * 2.5);
-    var wx  = Math.cos(spark.angle) * spark.frac * R_TUNNEL;
-    var wy  = Math.sin(spark.angle) * spark.frac * R_TUNNEL;
-    var fadeNear = Math.min(1, (relZ - NEAR) / 22);
-    ctx.globalAlpha = (0.38 + Math.random() * 0.28) * fadeNear;
-    ctx.strokeStyle = spark.purple ? 'rgba(178,95,255,1)' : 'rgba(225,195,255,1)';
-    ctx.lineWidth   = Math.max(0.8, 1.8 * s1);
-    ctx.beginPath();
-    ctx.moveTo(cx + wx * s0, cy + wy * s0);
-    ctx.lineTo(cx + wx * s1, cy + wy * s1);
-    ctx.stroke();
-    ctx.globalAlpha *= 0.9;
-    ctx.fillStyle = spark.purple ? 'rgba(200,140,255,1)' : '#fff';
-    ctx.beginPath();
-    ctx.arc(cx + wx * s1, cy + wy * s1, Math.max(0.8, 2 * s1), 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ── drawPulseRings ──────────────────────────────────────────────────────────
-  function drawPulseRings(now) {
-    var i, pr, t, expandR;
-    for (i = pulseRings.length - 1; i >= 0; i--) {
-      pr = pulseRings[i];
-      t  = (now - pr.startT) / pr.dur;
-      if (t >= 1) { pulseRings.splice(i, 1); continue; }
-      expandR = pr.rFrac * R_TUNNEL * (FOV / (NEAR + 28)) * (0.25 + t * 0.75);
-      ctx.globalAlpha = 0.65 * (1 - t);
-      ctx.strokeStyle = 'rgba(210,155,255,1)';
-      ctx.lineWidth   = Math.max(0.5, 2.8 * (1 - t * 0.6));
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, expandR, expandR * 0.6, 0, 0, Math.PI * 2);
-      ctx.stroke();
+    var s1 = FOV/relZ;
+    var wx = Math.cos(dp.angle)*dp.frac*R_TUNNEL;
+    var wy = Math.sin(dp.angle)*dp.frac*R_TUNNEL;
+    var sx = cx + wx*s1, sy = cy + wy*s1;
+    var r  = Math.max(0.5, dp.size*s1*(dp.layer===0?2.4:dp.layer===1?1.5:0.9));
+    var baseA = dp.layer===0 ? 0.60 : dp.layer===1 ? 0.38 : 0.20;
+    var fadeNear = Math.min(1,(relZ-NEAR)/22);
+    var alpha = baseA*fadeNear*(0.82 + Math.random()*0.36);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = dp.purple ? 'rgba(190,115,255,1)' : 'rgba(228,210,255,1)';
+    ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2); ctx.fill();
+    if (dp.layer===0 && r>1.0) {
+      ctx.globalAlpha = alpha*0.22;
+      ctx.fillStyle = 'rgba(168,85,247,1)';
+      ctx.beginPath(); ctx.arc(sx,sy,r*2.8,0,Math.PI*2); ctx.fill();
+    }
+    var s0  = FOV/Math.max(NEAR+1, relZ + spd*dt*3);
+    var sx0 = cx + wx*s0, sy0 = cy + wy*s0;
+    var dx = sx - sx0, dy = sy - sy0;
+    if (dx*dx + dy*dy > 0.25) {
+      ctx.globalAlpha = alpha*0.45;
+      ctx.strokeStyle = dp.purple ? 'rgba(180,100,255,1)' : 'rgba(220,200,255,1)';
+      ctx.lineWidth = Math.max(0.3, r*0.55);
+      ctx.beginPath(); ctx.moveTo(sx0,sy0); ctx.lineTo(sx,sy); ctx.stroke();
     }
   }
 
-  // ── main loop ───────────────────────────────────────────────────────────────
+  function drawPulseRings(now) {
+    var i, pr, t, expandR;
+    for (i = pulseRings.length-1; i >= 0; i--) {
+      pr = pulseRings[i]; t = (now - pr.startT) / pr.dur;
+      if (t >= 1) { pulseRings.splice(i,1); continue; }
+      expandR = pr.rFrac*R_TUNNEL*(FOV/(NEAR+28))*(0.25 + t*0.75);
+      ctx.globalAlpha = 0.62*(1-t);
+      ctx.strokeStyle = 'rgba(210,155,255,1)';
+      ctx.lineWidth   = Math.max(0.5, 2.8*(1-t*0.6));
+      ctx.beginPath(); ctx.ellipse(cx,cy,expandR,expandR*0.6,0,0,Math.PI*2); ctx.stroke();
+    }
+  }
+
   function loop(now) {
     if (!lastT) lastT = now;
-    var dt = Math.min((now - lastT) / 1000, 0.05);
-    lastT   = now;
-    elapsed += dt;
+    var dt = Math.min((now - lastT)/1000, 0.05);
+    lastT = now; elapsed += dt;
 
     boostMul = (now < boostEnd) ? 1.6 : 1;
-    var spd  = SPEED * boostMul;
+    var cardSlowMul = 1;
+    if (now < cardSlowEnd) {
+      var tSlow = 1 - (cardSlowEnd - now)/800;
+      cardSlowMul = 0.45 + 0.55*Math.max(0, Math.min(1, tSlow));
+    }
+    var spd = SPEED * boostMul * cardSlowMul;
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    ctx.clearRect(0, 0, W, H);
-
+    ctx.clearRect(0,0,W,H);
     if (!isTunnelMode) { raf = 0; return; }
 
-    cameraZ += spd * dt;
-
-    // Haze
+    cameraZ += spd*dt;
+    drawBloom(now);
     drawHaze();
-
     ctx.lineCap = 'round';
 
-    // Rings
-    var i, ring, streak, spark;
+    var i, ring, streak, dp;
     for (i = 0; i < rings.length; i++) {
       ring = rings[i];
       if (ring.z - cameraZ < NEAR) {
-        ring.z     = cameraZ + FAR * (0.65 + Math.random() * 0.35);
-        ring.rFrac = 0.88 + Math.random() * 0.24;
-        ring.alpha = 0.08 + Math.random() * 0.10;
-        ring.seg   = Math.random() < 0.28;
-        ring.phase = Math.random() * Math.PI * 2;
+        ring.z      = cameraZ + FAR*(0.65 + Math.random()*0.35);
+        ring.rFrac  = 0.88 + Math.random()*0.24;
+        ring.alpha  = 0.08 + Math.random()*0.10;
+        ring.seg    = Math.random() < 0.28;
+        ring.phase  = Math.random()*Math.PI*2;
+        ring.wobble = Math.random()*0.055;
+        ring.wfreq  = 0.7 + Math.random()*1.3;
       }
       drawRing(ring);
     }
 
-    // Streaks
     ctx.lineCap = 'butt';
     for (i = 0; i < streaks.length; i++) {
       streak = streaks[i];
       if (streak.z - cameraZ < NEAR) {
-        streak.angle = Math.random() * Math.PI * 2;
-        streak.frac  = Math.random() * 1.15;
-        streak.z     = cameraZ + FAR * (0.5 + Math.random() * 0.5);
+        streak.angle = Math.random()*Math.PI*2;
+        streak.frac  = Math.random()*1.15;
+        streak.z     = cameraZ + FAR*(0.5 + Math.random()*0.5);
       }
       drawStreak(streak, spd, dt);
     }
 
-    // Sparks
-    for (i = 0; i < sparks.length; i++) {
-      spark = sparks[i];
-      if (spark.z - cameraZ < NEAR) {
-        spark.angle  = Math.random() * Math.PI * 2;
-        spark.frac   = 0.6 + Math.random() * 0.55;
-        spark.z      = cameraZ + NEAR + Math.random() * (FAR * 0.7);
-        spark.purple = Math.random() < 0.55;
+    for (i = 0; i < dust.length; i++) {
+      dp = dust[i];
+      if (dp.z - cameraZ < NEAR) {
+        dp.angle  = Math.random()*Math.PI*2;
+        dp.frac   = Math.random()<0.22 ? Math.random()*0.32 : 0.5 + Math.random()*0.65;
+        dp.z      = cameraZ + NEAR + Math.random()*(FAR*(dp.layer===2?1.0:dp.layer===1?0.75:0.45));
+        dp.purple = Math.random() < 0.52;
       }
-      drawSpark(spark, spd, dt);
+      drawDust(dp, spd, dt);
     }
 
-    // Pulse rings
     ctx.lineCap = 'round';
     drawPulseRings(now);
-
     ctx.globalAlpha = 1;
 
-    // Milestones
     var m;
     for (m = 0; m < MILESTONES.length; m++) {
       if (!msDone[m] && cameraZ >= MILESTONES[m].triggerZ) {
-        msDone[m]  = true;
-        cardTimer  = now + CARD_DUR;
+        msDone[m]   = true;
+        cardTimer   = now + CARD_DUR;
+        cardSlowEnd = now + 800;
         showCard(MILESTONES[m]);
         triggerPulse(now);
       }
     }
     if (cardTimer && now > cardTimer) hideCard();
-
     if (cameraZ >= END_Z) { endAnimation(); return; }
-
     raf = requestAnimationFrame(loop);
   }
 
-  // ── Controls ────────────────────────────────────────────────────────────────
-  if (skipBtn)   skipBtn.addEventListener('click',  endAnimation);
+  if (skipBtn)   skipBtn.addEventListener('click', endAnimation);
   if (resumeBtn) resumeBtn.addEventListener('click', function() {
     if (isTunnelMode) showResumeMode(); else showTunnelMode();
   });
   if (replayBtn) replayBtn.addEventListener('click', showTunnelMode);
 
-  // Click anywhere → 500 ms speed boost
   document.addEventListener('click', function() {
     if (!isTunnelMode || done) return;
     boostEnd = performance.now() + 500;
   }, { passive: true });
 
-  // ── Init ────────────────────────────────────────────────────────────────────
   buildTimeline();
+  buildNoiseTex();
   resize();
   window.addEventListener('resize', resize, { passive: true });
 
   if (reduced) {
-    cvs.hidden          = true;
-    resumeEl.hidden     = false;
-    highlightsEl.hidden = false;
-    isTunnelMode        = false;
-    if (skipBtn)   skipBtn.hidden  = true;
+    cvs.hidden = true;
+    resumeEl.hidden = false; highlightsEl.hidden = false;
+    isTunnelMode = false;
+    if (skipBtn)   skipBtn.hidden = true;
     if (resumeBtn) resumeBtn.textContent = 'tunnel run';
   } else {
     initTunnel();
