@@ -21,12 +21,7 @@
   const getVP  = () => vv ? { ox: vv.offsetLeft, oy: vv.offsetTop } : { ox: 0, oy: 0 };
   const dprCap = () => Math.min(window.devicePixelRatio || 1, 2);
 
-  const COLORS = [
-    [68,  221, 255],  // ion cyan (primary)
-    [168,  85, 247],  // purple
-    [204,  85, 255],  // magenta
-    [68,  136, 255],  // blue
-  ];
+  const FALLBACK_RGB = [168, 85, 247];
   const MAIN_COUNT = 4, MICRO_COUNT = 2;
 
   // ── Canvas setup ─────────────────────────────────────────────────────────
@@ -40,9 +35,10 @@
   let W = 0, H = 0, dpr = 1;
   let raf = 0, activePanel = null;
   let fadeAlpha = 0, fadeDir = 0, startTime = 0;
-  let srcCenter = [0, 0], anchors = [], filaments = [], bursts = [];
+  let srcPts = [], srcSeeds = [], anchors = [], filaments = [], bursts = [];
+  let tetherRGB = FALLBACK_RGB.slice();
   let tiltEl = null, tiltLocalW = 0, tiltLocalH = 0;
-  let tiltBaseRect = null, tiltOrigin = [0, 0];
+  let panelRect = null, tiltOffset = [0, 0], tiltOrigin = [0, 0];
   let lastTiltUpdateAt = 0;
   let tiltCandidates = [];
 
@@ -56,16 +52,58 @@
   }
   resize();
 
-  // ── Source center at 60% down — hits the text, not the element midpoint ──
-  function computeSrcCenter() {
-    const r = srcEl.getBoundingClientRect(), vp = getVP();
-    return [(r.left + r.width * 0.5 - vp.ox) * dpr,
-            (r.top  + r.height * 0.60 - vp.oy) * dpr];
+  function parseColorToRGB(color) {
+    if (!color) return null;
+    const s = color.trim();
+    let m = s.match(/^rgba?\(([^)]+)\)$/i);
+    if (m) {
+      const parts = m[1].split(',').map((x) => x.trim());
+      if (parts.length < 3) return null;
+      const r = parseFloat(parts[0]), g = parseFloat(parts[1]), b = parseFloat(parts[2]);
+      const a = parts.length > 3 ? parseFloat(parts[3]) : 1;
+      if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null;
+      if (!Number.isFinite(a) || a <= 0) return null;
+      return [Math.max(0, Math.min(255, Math.round(r))),
+              Math.max(0, Math.min(255, Math.round(g))),
+              Math.max(0, Math.min(255, Math.round(b)))];
+    }
+    m = s.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (m) {
+      const h = m[1];
+      if (h.length === 3) return [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)];
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    }
+    return null;
+  }
+
+  function captureTetherRGB() {
+    const c = parseColorToRGB(getComputedStyle(srcEl).color);
+    tetherRGB = c || FALLBACK_RGB.slice();
   }
 
   function toCanvas(vx, vy) {
     const vp = getVP();
     return [(vx - vp.ox) * dpr, (vy - vp.oy) * dpr];
+  }
+
+  function buildSourceSeeds(total) {
+    const out = [];
+    for (let i = 0; i < total; i++) {
+      const t = total <= 1 ? 0.5 : i / (total - 1);
+      const nx = 0.15 + t * 0.70 + rnd(-0.015, 0.015);
+      const ny = 0.58 + rnd(-0.04, 0.04);
+      out.push({
+        nx: Math.max(0.12, Math.min(0.88, nx)),
+        ny: Math.max(0.50, Math.min(0.74, ny)),
+      });
+    }
+    return out;
+  }
+
+  function remapSourcePoints() {
+    if (!srcSeeds.length) return;
+    const r = srcEl.getBoundingClientRect();
+    srcPts = srcSeeds.map((s) => toCanvas(r.left + r.width * s.nx, r.top + r.height * s.ny));
   }
 
   function parseOriginToken(tok, ref, axis) {
@@ -149,25 +187,28 @@
   }
 
   function refreshTiltCache() {
-    if (!tiltEl) return;
+    if (!tiltEl || !activePanel) return;
     tiltLocalW = tiltEl.offsetWidth || 0;
     tiltLocalH = tiltEl.offsetHeight || 0;
-    tiltBaseRect = tiltEl.getBoundingClientRect();
+    panelRect = activePanel.getBoundingClientRect();
+    const tiltRect = tiltEl.getBoundingClientRect();
+    tiltOffset = [tiltRect.left - panelRect.left, tiltRect.top - panelRect.top];
     tiltOrigin = readOriginPx(tiltEl, tiltLocalW, tiltLocalH);
   }
 
   function projectLocalPoint(localX, localY) {
-    if (!tiltEl || !tiltBaseRect) return null;
+    if (!tiltEl || !panelRect) return null;
     const tf = getComputedStyle(tiltEl).transform;
     const m = (!tf || tf === 'none') ? new DOMMatrix() : new DOMMatrix(tf);
     const ox = tiltOrigin[0], oy = tiltOrigin[1];
     const p = new DOMPoint(localX - ox, localY - oy, 0, 1).matrixTransform(m);
     const w = (p.w && Number.isFinite(p.w) && p.w !== 0) ? p.w : 1;
-    return [tiltBaseRect.left + (p.x / w) + ox, tiltBaseRect.top + (p.y / w) + oy];
+    return [panelRect.left + tiltOffset[0] + (p.x / w) + ox,
+            panelRect.top  + tiltOffset[1] + (p.y / w) + oy];
   }
 
   function updateAnchorsFromTilt() {
-    if (!tiltEl || !tiltBaseRect || tiltLocalW <= 0 || tiltLocalH <= 0) return;
+    if (!tiltEl || !panelRect || tiltLocalW <= 0 || tiltLocalH <= 0) return;
     const inset = 1.5;
     const localPts = [
       [inset, inset],                              // top-left
@@ -184,7 +225,7 @@
   // ── Recompute on scroll/resize while hovering ─────────────────────────────
   function recomputeRects() {
     if (!activePanel) return;
-    srcCenter = computeSrcCenter();
+    remapSourcePoints();
     refreshTiltCache();
     updateAnchorsFromTilt();
   }
@@ -214,7 +255,8 @@
       const isMain = i < MAIN_COUNT;
       filaments.push({
         ai:    i % anchors.length,
-        ci:    i % COLORS.length,
+        si:    i % srcSeeds.length,
+        ci:    0,
         freq:  rnd(0.5, 1.6),
         phase: rnd(0, Math.PI * 2),
         amp:   rnd(isMain ? 35 : 12, isMain ? 80 : 35) * dpr,
@@ -231,10 +273,10 @@
   function drawFilament(f, elapsed, alpha) {
     if (!anchors[f.ai]) return;
     const [ax, ay] = anchors[f.ai];
-    const [sx, sy] = srcCenter;
+    const [sx, sy] = srcPts[f.si] || srcPts[0] || [0, 0];
     const mx = (sx + ax) / 2 + Math.sin(elapsed * f.freq + f.phase) * f.amp;
     const my = (sy + ay) / 2 + Math.cos(elapsed * f.freq * 0.7 + f.phase) * f.ampY;
-    const c = COLORS[f.ci];
+    const c = tetherRGB;
     const a = f.alpha * alpha;
     ctx.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
     if (f.main) {
@@ -258,7 +300,7 @@
         f.spark.dir *= -1; f.spark.t = Math.max(0, Math.min(1, f.spark.t));
       }
       const [spx, spy] = bezPt(f.spark.t, sx, sy, mx, my, ax, ay);
-      ctx.globalAlpha = a * 0.95; ctx.fillStyle = '#fff';
+      ctx.globalAlpha = a * 0.95; ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
       ctx.beginPath(); ctx.arc(spx, spy, 1.5 * dpr, 0, 6.283); ctx.fill();
     }
   }
@@ -268,7 +310,7 @@
     for (let j = 0; j < 5; j++) {
       const a = rnd(0, Math.PI * 2), spd = rnd(1, 3) * dpr;
       bursts.push({ x: bx, y: by, vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
-                    st: now, life: rnd(200, 340), ci: j % COLORS.length });
+                    st: now, life: rnd(200, 340), ci: 0 });
     }
   }
 
@@ -295,7 +337,7 @@
       const b = bursts[i]; const age = now - b.st;
       if (age > b.life) { bursts.splice(i, 1); continue; }
       b.x += b.vx; b.y += b.vy; b.vx *= 0.91; b.vy *= 0.91;
-      const c = COLORS[b.ci];
+      const c = tetherRGB;
       ctx.globalAlpha = (1 - age / b.life) * 0.9;
       ctx.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx.lineWidth = 2 * dpr;
       ctx.beginPath(); ctx.moveTo(b.x - b.vx * 3, b.y - b.vy * 3); ctx.lineTo(b.x, b.y); ctx.stroke();
@@ -318,8 +360,10 @@
       activePanel = panel;
       tiltEl = panel;
       lastTiltUpdateAt = 0;
+      srcSeeds = buildSourceSeeds(MAIN_COUNT + MICRO_COUNT);
+      captureTetherRGB();
       refreshTiltCache();
-      srcCenter = computeSrcCenter();
+      remapSourcePoints();
       updateAnchorsFromTilt();
       primeTiltElement(panel);
       buildFilaments();
@@ -337,7 +381,7 @@
       if (activePanel === panel) {
         activePanel = null;
         tiltEl = null;
-        tiltBaseRect = null;
+        panelRect = null;
         tiltCandidates = [];
         fadeDir = -1;
       }
