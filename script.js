@@ -2564,7 +2564,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!srcEl || !panels.length) return;
 
   const FALLBACK_PURPLE_RGB2 = [168, 85, 247];
-  const MAIN_N = 4, MICRO_N = 2;
+  const BEAM_COUNT = 4;
   const PARTICLE_BUDGET = 120;
 
   const vv = window.visualViewport;
@@ -2589,6 +2589,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
   let startTime2 = 0, activePanel2 = null, spikeUntil2 = 0;
   let srcPts2 = [], srcSeeds2 = [], anchors2 = [], beams2 = [], particles2 = [];
+  let beamFX2 = null;
   let heroRect2 = null, heroVisibleFactor2 = 0;
   // Read --accent from :root once; never sample headline text (which is white by default)
   const _accentRaw = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
@@ -2647,30 +2648,51 @@ document.addEventListener('DOMContentLoaded', () => {
     panelRO2.observe(panel);
   }
 
-  // Side midpoint anchors on outer panel: top / right / bottom / left
-  function sideAnchors2(rect) {
+  // Corner anchors on panel: TL, TR, BR, BL (small inset so lines land on card edge)
+  function cornerAnchors2(rect) {
     const vp = getVP();
-    const iw = Math.min(3, rect.width  * 0.10);
-    const ih = Math.min(3, rect.height * 0.10);
-    const mX = rect.left + rect.width  * 0.5;
-    const mY = rect.top  + rect.height * 0.5;
+    const iw = Math.min(6, rect.width  * 0.03);
+    const ih = Math.min(6, rect.height * 0.03);
     return [
-      [(mX              - vp.ox) * dpr2, (rect.top    + ih - vp.oy) * dpr2],
-      [(rect.right - iw - vp.ox) * dpr2, (mY               - vp.oy) * dpr2],
-      [(mX              - vp.ox) * dpr2, (rect.bottom - ih - vp.oy) * dpr2],
-      [(rect.left  + iw - vp.ox) * dpr2, (mY               - vp.oy) * dpr2],
+      [(rect.left  + iw - vp.ox) * dpr2, (rect.top    + ih - vp.oy) * dpr2],
+      [(rect.right - iw - vp.ox) * dpr2, (rect.top    + ih - vp.oy) * dpr2],
+      [(rect.right - iw - vp.ox) * dpr2, (rect.bottom - ih - vp.oy) * dpr2],
+      [(rect.left  + iw - vp.ox) * dpr2, (rect.bottom - ih - vp.oy) * dpr2],
     ];
   }
 
-  // Pair source points → anchors sorted by x to minimise visual crossings
+  // Generate stable per-beam style/motion params (called once per hover activation)
+  function initBeamFX2() {
+    beamFX2 = [];
+    for (var i = 0; i < BEAM_COUNT; i++) {
+      beamFX2.push({
+        freq:  rnd2(0.5, 1.6),
+        phase: rnd2(0, Math.PI * 2),
+        amp:   rnd2(35, 80),
+        ampY:  rnd2(20, 50),
+        alpha: rnd2(0.65, 0.85),
+        lw:    rnd2(1.2, 1.8),
+        spark: { t: rnd2(0, 1), spd: rnd2(0.004, 0.010), dir: 1 },
+      });
+    }
+  }
+
+  // Build exactly 4 beams wiring src→anchor, reading stable params from beamFX2
   function buildBeams2() {
     beams2 = [];
-    if (!srcPts2.length || !anchors2.length) return;
-    const total = MAIN_N + MICRO_N;
-    const sIdxs = [...Array(srcPts2.length).keys()].sort((a, b) => srcPts2[a][0] - srcPts2[b][0]);
-    const aIdxs = [...Array(anchors2.length).keys()].sort((a, b) => anchors2[a][0] - anchors2[b][0]);
-    for (let i = 0; i < total; i++) {
-      beams2.push({ si: sIdxs[i % sIdxs.length], ai: aIdxs[i % aIdxs.length] });
+    if (!srcPts2.length || !anchors2.length || !beamFX2) return;
+    for (var i = 0; i < BEAM_COUNT; i++) {
+      var fx = beamFX2[i];
+      beams2.push({
+        si: 0, ai: i % anchors2.length,
+        freq:  fx.freq,
+        phase: fx.phase,
+        amp:   fx.amp * dpr2,
+        ampY:  fx.ampY * dpr2,
+        alpha: fx.alpha,
+        lw:    fx.lw,
+        spark: fx.spark,
+      });
     }
   }
 
@@ -2727,31 +2749,44 @@ document.addEventListener('DOMContentLoaded', () => {
       const [cr, cg, cb] = tetherRGB2;
       const elapsed = (now - startTime2) * 0.001;
 
-      // Draw beam guide paths — two-pass: glow then core
+      // Draw filaments — index-matched two-pass with endpoint dots + spark travelers
       ctx2.save();
       ctx2.lineCap = 'round';
+      var cStr = 'rgb(' + cr + ',' + cg + ',' + cb + ')';
       for (let i = 0; i < beams2.length; i++) {
         const bm = beams2[i];
         const [sx, sy] = srcPts2[bm.si] || srcPts2[0];
         const [ax, ay] = anchors2[bm.ai] || anchors2[0];
-        const oscX = Math.sin(elapsed * 0.8 + i * 1.1) * 30 * dpr2;
-        const oscY = Math.cos(elapsed * 0.6 + i * 0.9) * 20 * dpr2;
-        const mx = (sx + ax) * 0.5 + oscX;
-        const my = (sy + ay) * 0.5 + oscY;
+        const mx = (sx + ax) * 0.5 + Math.sin(elapsed * bm.freq + bm.phase) * bm.amp;
+        const my = (sy + ay) * 0.5 + Math.cos(elapsed * bm.freq * 0.7 + bm.phase) * bm.ampY;
+        const a = bm.alpha * fadeAlpha2;
+        ctx2.strokeStyle = cStr;
         // Glow pass
-        ctx2.globalAlpha = fadeAlpha2 * 0.10;
-        ctx2.strokeStyle = `rgb(${cr},${cg},${cb})`;
-        ctx2.lineWidth = 5 * dpr2;
-        ctx2.shadowColor = `rgba(${cr},${cg},${cb},0.6)`;
-        ctx2.shadowBlur = 12 * dpr2;
+        ctx2.globalAlpha = a * 0.22;
+        ctx2.lineWidth = bm.lw * dpr2 * 4;
         ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
         // Core pass
-        ctx2.globalAlpha = fadeAlpha2 * 0.18;
-        ctx2.lineWidth = 1 * dpr2;
-        ctx2.shadowBlur = 0;
+        ctx2.globalAlpha = a * 0.88;
+        ctx2.lineWidth = bm.lw * dpr2;
         ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
+        // Endpoint dots
+        var pulse = 0.5 + 0.5 * Math.sin(elapsed * 3.5 + bm.phase);
+        var nr = (1.5 + pulse * 1.5) * dpr2;
+        ctx2.globalAlpha = a * (0.65 + pulse * 0.35);
+        ctx2.fillStyle = cStr;
+        ctx2.beginPath(); ctx2.arc(sx, sy, nr, 0, 6.283); ctx2.fill();
+        ctx2.beginPath(); ctx2.arc(ax, ay, nr * 0.85, 0, 6.283); ctx2.fill();
+        // Spark traveler
+        if (bm.spark) {
+          bm.spark.t += bm.spark.spd * bm.spark.dir;
+          if (bm.spark.t > 1.05 || bm.spark.t < -0.05) {
+            bm.spark.dir *= -1; bm.spark.t = Math.max(0, Math.min(1, bm.spark.t));
+          }
+          var sp = bezPt2(bm.spark.t, sx, sy, mx, my, ax, ay);
+          ctx2.globalAlpha = a * 0.95;
+          ctx2.beginPath(); ctx2.arc(sp[0], sp[1], 1.5 * dpr2, 0, 6.283); ctx2.fill();
+        }
       }
-      ctx2.shadowBlur = 0;
       ctx2.restore();
 
       // Spawn new particles while fading in / stable and under budget.
@@ -2821,8 +2856,11 @@ document.addEventListener('DOMContentLoaded', () => {
     remapSourcePoints2();
     updateHeroRect2();
     const r = activePanel2.getBoundingClientRect();
-    anchors2 = sideAnchors2(r);
-    buildBeams2();
+    anchors2 = cornerAnchors2(r);
+    // Update anchor refs in existing beams without re-randomizing params
+    for (var i = 0; i < beams2.length; i++) {
+      beams2[i].ai = i % anchors2.length;
+    }
   }
   let scrollTick2 = 0;
   function scheduleRecompute2() {
@@ -2831,14 +2869,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   window.addEventListener('scroll', scheduleRecompute2, { passive: true });
-  window.addEventListener('resize', () => { resize2(); scheduleRecompute2(); }, { passive: true });
+  window.addEventListener('resize', () => { resize2(); if (beamFX2) buildBeams2(); scheduleRecompute2(); }, { passive: true });
   // Horizontal rail scroll keeps conduit locked to the moving card
   const collageStack2 = document.getElementById('collageStack');
   if (collageStack2) collageStack2.addEventListener('scroll', scheduleRecompute2, { passive: true });
   // iOS visualViewport scroll/resize
   if (vv) {
     vv.addEventListener('scroll', scheduleRecompute2, { passive: true });
-    vv.addEventListener('resize', () => { resize2(); scheduleRecompute2(); }, { passive: true });
+    vv.addEventListener('resize', () => { resize2(); if (beamFX2) buildBeams2(); scheduleRecompute2(); }, { passive: true });
   }
 
   panels.forEach((panel) => {
@@ -2849,7 +2887,8 @@ document.addEventListener('DOMContentLoaded', () => {
       remapSourcePoints2();
       updateHeroRect2();
       const r2 = panel.getBoundingClientRect();
-      anchors2 = sideAnchors2(r2);
+      anchors2 = cornerAnchors2(r2);
+      initBeamFX2();
       buildBeams2();
       particles2 = [];
       // Burst: spawn 12 particles immediately for impact
