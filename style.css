@@ -2149,6 +2149,7 @@ body.services-active .services::before {
     display: flex;
     align-items: center;
     overflow: visible;
+    position: relative;
   }
 
   .collage-stack {
@@ -2243,6 +2244,67 @@ body.services-active .services::before {
     font-size: 0.9rem;
     line-height: 1.35;
     margin-top: 0.3rem;
+  }
+
+  /* --- Collage edge nav --- */
+  .collage-edge-nav {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .collage-edge-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0;
+    transition: opacity 150ms, background 150ms;
+  }
+
+  .collage-edge-btn--prev { left: 1rem; }
+  .collage-edge-btn--next { right: 1rem; }
+
+  #collageScrollPin:hover .collage-edge-btn,
+  .collage-edge-btn:focus-visible {
+    opacity: 1;
+  }
+
+  .collage-edge-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  #collageScrollPin:hover .collage-edge-btn:disabled,
+  .collage-edge-btn:disabled {
+    opacity: 0.15;
+    pointer-events: none;
+    cursor: default;
+  }
+
+  .collage-edge-btn svg {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+}
+
+@media (min-width: 1200px) and (prefers-reduced-motion: reduce) {
+  .collage-edge-btn {
+    transition: none;
   }
 }
 

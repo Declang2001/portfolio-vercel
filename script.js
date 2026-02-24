@@ -1411,7 +1411,115 @@ function initPinnedCollageScroll() {
     new ResizeObserver(recalc).observe(stack);
   }
   window.addEventListener('load', recalc);
+
+  // ── Collage edge nav: left/right overlay chevrons ────────────────────────
+  const svgL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10,12 6,8 10,4"/></svg>';
+  const svgR = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,4 10,8 6,12"/></svg>';
+
+  const edgeNav = document.createElement('div');
+  edgeNav.className = 'collage-edge-nav';
+
+  const prevBtn = document.createElement('button');
+  prevBtn.type = 'button';
+  prevBtn.className = 'collage-edge-btn collage-edge-btn--prev';
+  prevBtn.setAttribute('aria-label', 'Previous card');
+  prevBtn.innerHTML = svgL;
+
+  const nextBtn = document.createElement('button');
+  nextBtn.type = 'button';
+  nextBtn.className = 'collage-edge-btn collage-edge-btn--next';
+  nextBtn.setAttribute('aria-label', 'Next card');
+  nextBtn.innerHTML = svgR;
+
+  edgeNav.appendChild(prevBtn);
+  edgeNav.appendChild(nextBtn);
+  pin.appendChild(edgeNav);
+
+  let snapLefts  = [];
+  let navRafBusy = false;
+
+  function buildSnaps() {
+    snapLefts = Array.from(panels).map(p =>
+      Math.round(p.offsetLeft + p.offsetWidth / 2 - stack.clientWidth / 2)
+    );
+  }
+
+  function getActiveIdx() {
+    if (!snapLefts.length) return 0;
+    const sl = stack.scrollLeft;
+    let best = 0, bestDist = Infinity;
+    snapLefts.forEach((pos, i) => {
+      const d = Math.abs(sl - pos);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    return best;
+  }
+
+  function updateBtns() {
+    const idx = getActiveIdx();
+    prevBtn.disabled = idx === 0;
+    nextBtn.disabled = idx === snapLefts.length - 1;
+  }
+
+  function scrollToIdx(idx) {
+    if (idx < 0 || idx >= snapLefts.length) return;
+    const target = snapLefts[idx];
+    if (prefersReduced.matches) {
+      stack.scrollLeft = target;
+      updateBtns();
+      return;
+    }
+    const start = stack.scrollLeft;
+    const delta = target - start;
+    if (Math.abs(delta) < 2) { updateBtns(); return; }
+    const dur = 380;
+    const t0  = performance.now();
+    navRafBusy = true;
+    function step(now) {
+      const p    = Math.min((now - t0) / dur, 1);
+      const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      stack.scrollLeft = start + delta * ease;
+      if (p < 1) {
+        requestAnimationFrame(step);
+      } else {
+        navRafBusy = false;
+        updateBtns();
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  prevBtn.addEventListener('click', () => scrollToIdx(getActiveIdx() - 1));
+  nextBtn.addEventListener('click', () => scrollToIdx(getActiveIdx() + 1));
+
+  // ArrowLeft/Right when focus is anywhere inside the pin
+  pin.addEventListener('keydown', e => {
+    if (!isDesktop()) return;
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); scrollToIdx(getActiveIdx() - 1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); scrollToIdx(getActiveIdx() + 1); }
+  });
+
+  // RAF-throttled scroll → update button disabled state
+  let btnSyncTick = false;
+  stack.addEventListener('scroll', () => {
+    if (navRafBusy || btnSyncTick) return;
+    btnSyncTick = true;
+    requestAnimationFrame(() => { btnSyncTick = false; if (!navRafBusy) updateBtns(); });
+  }, { passive: true });
+
+  // Rebuild snaps after recalc settles (deferred via rAF)
+  let rebuildRaf = null;
+  function scheduleRebuild() {
+    if (rebuildRaf !== null) return;
+    rebuildRaf = requestAnimationFrame(() => { rebuildRaf = null; buildSnaps(); updateBtns(); });
+  }
+  window.addEventListener('resize', scheduleRebuild);
+  window.addEventListener('load',   scheduleRebuild);
+  // ─────────────────────────────────────────────────────────────────────────
+
   recalc();
+  buildSnaps();
+  updateBtns();
 }
 
 
