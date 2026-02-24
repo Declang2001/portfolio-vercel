@@ -2326,6 +2326,170 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// ── Approach collage: tether filaments from .approach-title → hovered panel ──
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.body.classList.contains('approach-page')) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!window.matchMedia('(hover: hover)').matches) return;
+
+  const srcEl  = document.querySelector('.approach-title');
+  const panels = document.querySelectorAll('#collageStack .collage-panel');
+  if (!srcEl || !panels.length) return;
+
+  const COLORS = [[68,221,255],[168,85,247],[204,85,255],[68,136,255]];
+  const MAIN_N = 3, MICRO_N = 2;
+
+  const vv = window.visualViewport;
+  const getVP = () => vv ? { ox: vv.offsetLeft, oy: vv.offsetTop }
+                          : { ox: 0, oy: 0 };
+  const dprCap = () => Math.min(window.devicePixelRatio || 1, 2);
+
+  const cvs = document.createElement('canvas');
+  cvs.setAttribute('aria-hidden', 'true');
+  cvs.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:25;';
+  document.body.appendChild(cvs);
+  const ctx2 = cvs.getContext('2d');
+  let W2 = 0, H2 = 0, dpr2 = 1;
+
+  function resize2() {
+    dpr2 = dprCap();
+    W2 = Math.round((vv ? vv.width : window.innerWidth) * dpr2);
+    H2 = Math.round((vv ? vv.height : window.innerHeight) * dpr2);
+    cvs.width = W2; cvs.height = H2;
+  }
+  resize2();
+  window.addEventListener('resize', resize2, { passive: true });
+
+  let raf2 = 0, fadeAlpha2 = 0, fadeDir2 = 0;
+  let startTime2 = 0, activePanel2 = null;
+  let srcPt2 = [0, 0], anchors2 = [], fils2 = [], bursts2 = [];
+  const rnd2 = (a, b) => Math.random() * (b - a) + a;
+
+  function getPt(el) {
+    const r = el.getBoundingClientRect(), vp = getVP();
+    return [(r.left + r.width / 2 - vp.ox) * dpr2, (r.top + r.height / 2 - vp.oy) * dpr2];
+  }
+
+  function perimPts(rect, n) {
+    const vp = getVP();
+    const { left, right, top, bottom, width, height } = rect;
+    const peri = 2 * (width + height), step = peri / n, pts = [];
+    for (let i = 0; i < n; i++) {
+      let d = step * i + step * 0.1 + rnd2(-step * 0.2, step * 0.2);
+      d = ((d % peri) + peri) % peri;
+      let x, y;
+      if (d < width)                   { x = left + d;                          y = top; }
+      else if (d < width + height)     { x = right;                             y = top + (d - width); }
+      else if (d < 2 * width + height) { x = right - (d - width - height);      y = bottom; }
+      else                             { x = left;                              y = bottom - (d - 2 * width - height); }
+      pts.push([(x - vp.ox) * dpr2, (y - vp.oy) * dpr2]);
+    }
+    return pts;
+  }
+
+  function bezPt2(t, x0, y0, cx, cy, x1, y1) {
+    const mt = 1 - t;
+    return [mt*mt*x0 + 2*mt*t*cx + t*t*x1, mt*mt*y0 + 2*mt*t*cy + t*t*y1];
+  }
+
+  function buildFils2() {
+    fils2 = [];
+    const total = MAIN_N + MICRO_N;
+    for (let i = 0; i < total; i++) {
+      const main = i < MAIN_N;
+      fils2.push({
+        ai: i % anchors2.length, ci: i % COLORS.length,
+        freq: rnd2(0.5, 1.6), phase: rnd2(0, Math.PI * 2),
+        amp:  rnd2(main ? 35 : 12, main ? 80 : 35) * dpr2,
+        ampY: rnd2(main ? 20 : 8,  main ? 50 : 20) * dpr2,
+        alpha: main ? rnd2(0.50, 0.75) : rnd2(0.15, 0.30),
+        lw: main ? rnd2(1.0, 1.6) : rnd2(0.5, 0.8), main,
+        spark: main ? { t: rnd2(0, 1), spd: rnd2(0.004, 0.01), dir: 1 } : null,
+      });
+    }
+  }
+
+  function drawFil2(f, elapsed, alpha) {
+    if (!anchors2[f.ai]) return;
+    const [ax, ay] = anchors2[f.ai], [sx, sy] = srcPt2;
+    const mx = (sx + ax) / 2 + Math.sin(elapsed * f.freq + f.phase) * f.amp;
+    const my = (sy + ay) / 2 + Math.cos(elapsed * f.freq * 0.7 + f.phase) * f.ampY;
+    const c = COLORS[f.ci], a = f.alpha * alpha;
+    ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+    if (f.main) {
+      ctx2.globalAlpha = a * 0.18; ctx2.lineWidth = f.lw * dpr2 * 4;
+      ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
+    }
+    ctx2.globalAlpha = a * (f.main ? 0.82 : 0.70); ctx2.lineWidth = f.lw * dpr2;
+    ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
+    if (f.main) {
+      const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3.5 + f.phase);
+      const nr = (1.5 + pulse * 1.5) * dpr2;
+      ctx2.globalAlpha = a * (0.6 + pulse * 0.4);
+      ctx2.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx2.beginPath(); ctx2.arc(sx, sy, nr, 0, 6.283); ctx2.fill();
+      ctx2.beginPath(); ctx2.arc(ax, ay, nr * 0.85, 0, 6.283); ctx2.fill();
+    }
+    if (f.spark) {
+      f.spark.t += f.spark.spd * f.spark.dir;
+      if (f.spark.t > 1.05 || f.spark.t < -0.05) { f.spark.dir *= -1; f.spark.t = Math.max(0, Math.min(1, f.spark.t)); }
+      const [spx, spy] = bezPt2(f.spark.t, sx, sy, mx, my, ax, ay);
+      ctx2.globalAlpha = a * 0.95; ctx2.fillStyle = '#fff';
+      ctx2.beginPath(); ctx2.arc(spx, spy, 1.5 * dpr2, 0, 6.283); ctx2.fill();
+    }
+  }
+
+  function renderApproachTether(now) {
+    ctx2.clearRect(0, 0, W2, H2); ctx2.globalAlpha = 1;
+    fadeAlpha2 = fadeDir2 > 0 ? Math.min(fadeAlpha2 + 0.07, 1)
+               : fadeDir2 < 0 ? Math.max(fadeAlpha2 - 0.06, 0)
+               : fadeAlpha2;
+    const elapsed = (now - startTime2) * 0.001;
+    if (fadeAlpha2 > 0 && anchors2.length) {
+      ctx2.save();
+      for (let i = 0; i < fils2.length; i++) drawFil2(fils2[i], elapsed, fadeAlpha2);
+      ctx2.restore();
+    }
+    for (let i = bursts2.length - 1; i >= 0; i--) {
+      const b = bursts2[i]; const age = now - b.st;
+      if (age > b.life) { bursts2.splice(i, 1); continue; }
+      b.x += b.vx; b.y += b.vy; b.vx *= 0.91; b.vy *= 0.91;
+      const c = COLORS[b.ci];
+      ctx2.globalAlpha = (1 - age / b.life) * 0.9;
+      ctx2.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx2.lineWidth = 2 * dpr2;
+      ctx2.beginPath(); ctx2.moveTo(b.x - b.vx * 3, b.y - b.vy * 3); ctx2.lineTo(b.x, b.y); ctx2.stroke();
+    }
+    if (fadeAlpha2 > 0 || bursts2.length) { raf2 = requestAnimationFrame(renderApproachTether); }
+    else { raf2 = 0; ctx2.clearRect(0, 0, W2, H2); }
+  }
+
+  panels.forEach((panel) => {
+    panel.addEventListener('pointerenter', () => {
+      activePanel2 = panel;
+      srcPt2   = getPt(srcEl);
+      anchors2 = perimPts(panel.getBoundingClientRect(), MAIN_N + MICRO_N);
+      buildFils2(); fadeDir2 = 1; startTime2 = performance.now();
+      if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
+      setTimeout(() => {
+        const now = performance.now();
+        for (let i = 0; i < MAIN_N; i++) {
+          if (!anchors2[i]) continue;
+          for (let j = 0; j < 5; j++) {
+            const a = Math.random() * Math.PI * 2, spd = rnd2(1, 3) * dpr2;
+            bursts2.push({ x: anchors2[i][0], y: anchors2[i][1],
+                           vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
+                           st: now, life: rnd2(180, 320), ci: i % COLORS.length });
+          }
+        }
+      }, 120);
+    }, { passive: true });
+
+    panel.addEventListener('pointerleave', () => {
+      if (activePanel2 === panel) { activePanel2 = null; fadeDir2 = -1; }
+      if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
+    }, { passive: true });
+  });
+});
 
 
 
