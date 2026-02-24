@@ -2565,7 +2565,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const FALLBACK_PURPLE_RGB2 = [168, 85, 247];
   const MAIN_N = 4, MICRO_N = 2;
-  const PARTICLE_BUDGET = 70;
+  const PARTICLE_BUDGET = 120;
 
   const vv = window.visualViewport;
   const getVP = () => vv ? { ox: vv.offsetLeft, oy: vv.offsetTop } : { ox: 0, oy: 0 };
@@ -2573,7 +2573,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const cvs = document.createElement('canvas');
   cvs.setAttribute('aria-hidden', 'true');
-  cvs.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;';
+  cvs.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;';
   document.body.appendChild(cvs);
   const ctx2 = cvs.getContext('2d');
   let W2 = 0, H2 = 0, dpr2 = 1;
@@ -2622,15 +2622,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return null;
   }
 
-  function buildSourceSeeds2(total) {
-    const out = [];
-    for (let i = 0; i < total; i++) {
-      const t = total <= 1 ? 0.5 : i / (total - 1);
-      const nx = 0.15 + t * 0.70 + rnd2(-0.015, 0.015);
-      const ny = 0.58 + rnd2(-0.04, 0.04);
-      out.push({ nx: Math.max(0.12, Math.min(0.88, nx)), ny: Math.max(0.50, Math.min(0.74, ny)) });
-    }
-    return out;
+  function buildSourceSeeds2() {
+    return [{ nx: 0.5, ny: 0.5 }];
   }
 
   function remapSourcePoints2() {
@@ -2712,12 +2705,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const midX = (sx + ax) * 0.5 + rnd2(-55, 55) * dpr2;
     const midY = (sy + ay) * 0.5 + rnd2(-35, 35) * dpr2;
+    var isSpark = Math.random() < 0.15;
     particles2.push({
       x0: sx, y0: sy, cx: midX, cy: midY, x1: ax, y1: ay,
-      t: 0, spd: rnd2(0.003, 0.007),
+      t: 0, spd: rnd2(0.0025, 0.006),
       jx: rnd2(-1.5, 1.5) * dpr2, jy: rnd2(-1.5, 1.5) * dpr2,
-      alpha: rnd2(0.38, 0.65),
-      r: rnd2(0.5, 1.2) * dpr2,
+      alpha: isSpark ? 0.90 : rnd2(0.50, 0.85),
+      r: (isSpark ? 2.5 : rnd2(0.8, 2.0)) * dpr2,
+      spark: isSpark,
     });
   }
 
@@ -2732,28 +2727,38 @@ document.addEventListener('DOMContentLoaded', () => {
       const [cr, cg, cb] = tetherRGB2;
       const elapsed = (now - startTime2) * 0.001;
 
-      // Draw faint beam guide paths (breathing beziers)
+      // Draw beam guide paths — two-pass: glow then core
       ctx2.save();
-      ctx2.strokeStyle = `rgb(${cr},${cg},${cb})`;
-      ctx2.lineWidth = dpr2;
+      ctx2.lineCap = 'round';
       for (let i = 0; i < beams2.length; i++) {
         const bm = beams2[i];
         const [sx, sy] = srcPts2[bm.si] || srcPts2[0];
         const [ax, ay] = anchors2[bm.ai] || anchors2[0];
-        const oscX = Math.sin(elapsed * 0.8 + i * 1.1) * 22 * dpr2;
-        const oscY = Math.cos(elapsed * 0.6 + i * 0.9) * 14 * dpr2;
+        const oscX = Math.sin(elapsed * 0.8 + i * 1.1) * 30 * dpr2;
+        const oscY = Math.cos(elapsed * 0.6 + i * 0.9) * 20 * dpr2;
         const mx = (sx + ax) * 0.5 + oscX;
         const my = (sy + ay) * 0.5 + oscY;
-        ctx2.globalAlpha = fadeAlpha2 * 0.045;
+        // Glow pass
+        ctx2.globalAlpha = fadeAlpha2 * 0.10;
+        ctx2.strokeStyle = `rgb(${cr},${cg},${cb})`;
+        ctx2.lineWidth = 5 * dpr2;
+        ctx2.shadowColor = `rgba(${cr},${cg},${cb},0.6)`;
+        ctx2.shadowBlur = 12 * dpr2;
+        ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
+        // Core pass
+        ctx2.globalAlpha = fadeAlpha2 * 0.18;
+        ctx2.lineWidth = 1 * dpr2;
+        ctx2.shadowBlur = 0;
         ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.quadraticCurveTo(mx, my, ax, ay); ctx2.stroke();
       }
+      ctx2.shadowBlur = 0;
       ctx2.restore();
 
       // Spawn new particles while fading in / stable and under budget.
       // During spike: higher budget and spawn cap for a brief surge.
       const spiking2     = performance.now() < spikeUntil2;
-      const effBudget2   = spiking2 ? 140 : PARTICLE_BUDGET;
-      const effSpawnCap2 = spiking2 ? 4 : 2;
+      const effBudget2   = spiking2 ? 240 : PARTICLE_BUDGET;
+      const effSpawnCap2 = spiking2 ? 7 : 3;
       if (particles2.length < effBudget2 && fadeDir2 >= 0) {
         const heroSpawnRatio = 0.25 + 0.7 * heroVisibleFactor2;
         const spawnCount = Math.min(effSpawnCap2, effBudget2 - particles2.length);
@@ -2788,9 +2793,14 @@ document.addEventListener('DOMContentLoaded', () => {
           );
           if (minDist < excMgn) heroFade = Math.max(0, minDist / excMgn);
         }
-        ctx2.globalAlpha = fadeAlpha2 * p.alpha * fadeIn * fadeOut * heroFade;
+        var pAlpha = fadeAlpha2 * p.alpha * fadeIn * fadeOut * heroFade;
+        ctx2.globalAlpha = pAlpha;
         ctx2.fillStyle = `rgb(${cr},${cg},${cb})`;
         ctx2.beginPath(); ctx2.arc(ptx, pty, p.r, 0, 6.283); ctx2.fill();
+        if (p.spark && pAlpha > 0.15) {
+          ctx2.globalAlpha = pAlpha * 0.25;
+          ctx2.beginPath(); ctx2.arc(ptx, pty, p.r * 3, 0, 6.283); ctx2.fill();
+        }
       }
       ctx2.restore();
     }
@@ -2835,13 +2845,15 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.addEventListener('pointerenter', () => {
       activePanel2 = panel;
       srcEl.classList.add('tether-headline-active');
-      srcSeeds2 = buildSourceSeeds2(MAIN_N + MICRO_N);
+      srcSeeds2 = buildSourceSeeds2();
       remapSourcePoints2();
       updateHeroRect2();
       const r2 = panel.getBoundingClientRect();
       anchors2 = sideAnchors2(r2);
       buildBeams2();
       particles2 = [];
+      // Burst: spawn 12 particles immediately for impact
+      for (var bi = 0; bi < 12; bi++) spawnParticle2(Math.random() < 0.3);
       attachPanelObserver2(panel);
       fadeDir2 = 1; startTime2 = performance.now();
       if (!raf2) raf2 = requestAnimationFrame(renderApproachTether);
