@@ -175,6 +175,9 @@
       letter-spacing: -0.01em;
       line-height: 1.08;
       margin: 0;
+      overflow-wrap: normal;
+      word-break: normal;
+      white-space: normal;
     }
     .journey-replay-sm {
       font: inherit;
@@ -418,7 +421,21 @@
       .journey-resume { padding-left: 1.1rem; padding-right: 1.1rem; }
       .journey-highlights { padding-left: 1.1rem; padding-right: 1.1rem; }
       .resume-contact-row { gap: 0.15rem 0; }
+      .resume-name-row {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.6rem;
+      }
       .resume-name-spacer { display: none; }
+      .journey-replay-sm {
+        order: -1;
+        align-self: flex-end;
+      }
+      .resume-name {
+        text-align: center;
+        width: 100%;
+      }
     }
     @media (max-width: 600px) {
       .journey-ctrl-btn { font-size: 0.88rem; padding: 0.82rem 1.15rem; min-height: 46px; }
@@ -441,38 +458,62 @@
     /* ── Journey progress slider ── */
     .journey-scrub-wrap {
       position: fixed;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 82px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 105px);
       left: 50%;
       transform: translateX(-50%);
-      z-index: 99;
+      z-index: 200;
       width: clamp(220px, 52vw, 400px);
-      padding: 6px 0;
+      padding: 4px 0;
       display: flex;
       align-items: center;
+      touch-action: none;
+      pointer-events: auto;
+      opacity: 1;
+      transition: opacity 200ms ease, transform 200ms ease;
+    }
+    .journey-scrub-wrap.scrub-out {
+      opacity: 0;
+      transform: translateX(-50%) translateY(6px);
+      pointer-events: none;
     }
     .journey-scrub {
+      --prog: 0;
       -webkit-appearance: none;
       appearance: none;
       width: 100%;
-      height: 4px;
+      height: 28px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.10);
-      border: 1px solid rgba(255,255,255,0.06);
+      background: transparent;
+      border: none;
       outline: none;
       cursor: pointer;
       touch-action: none;
+      margin: 0;
+      padding: 0;
     }
     /* Track — WebKit */
     .journey-scrub::-webkit-slider-runnable-track {
       height: 4px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.10);
+      background: linear-gradient(
+        to right,
+        rgba(168,85,247,0.45) 0%,
+        rgba(168,85,247,0.45) calc(var(--prog) * 100%),
+        rgba(255,255,255,0.10) calc(var(--prog) * 100%),
+        rgba(255,255,255,0.10) 100%
+      );
     }
     /* Track — Firefox */
     .journey-scrub::-moz-range-track {
       height: 4px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.10);
+      background: linear-gradient(
+        to right,
+        rgba(168,85,247,0.45) 0%,
+        rgba(168,85,247,0.45) calc(var(--prog) * 100%),
+        rgba(255,255,255,0.10) calc(var(--prog) * 100%),
+        rgba(255,255,255,0.10) 100%
+      );
       border: none;
     }
     /* Thumb — WebKit */
@@ -513,7 +554,7 @@
       outline-offset: 4px;
     }
     @media (max-width: 600px) {
-      .journey-scrub-wrap { width: clamp(180px, 70vw, 320px); bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); }
+      .journey-scrub-wrap { width: clamp(180px, 70vw, 320px); bottom: calc(env(safe-area-inset-bottom, 0px) + 95px); }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -529,7 +570,7 @@
         filter: none;
         transform: none;
       }
-      .journey-scrub-wrap { display: none; }
+      .journey-scrub-wrap { display: none; transition: none; }
     }
   </style>
 </head>

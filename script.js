@@ -3142,6 +3142,19 @@ document.addEventListener('DOMContentLoaded', () => {
   let raf = 0, lastT = 0, elapsed = 0;
   let isTunnelMode = !reduced, done = false;
   let isScrubbing = false, scrubMin = 0;
+  var scrubHideTimer = 0;
+  function showScrub() {
+    if (!scrubWrap) return;
+    clearTimeout(scrubHideTimer);
+    scrubWrap.hidden = false;
+    scrubWrap.classList.remove('scrub-out');
+  }
+  function hideScrub() {
+    if (!scrubWrap) return;
+    scrubWrap.classList.add('scrub-out');
+    clearTimeout(scrubHideTimer);
+    scrubHideTimer = setTimeout(function() { scrubWrap.hidden = true; }, 220);
+  }
 
   const FOV = 500, NEAR = 14, FAR = 1800, SPEED = 65, END_Z = 1300;
   // Milestone phase durations (ms)
@@ -3153,7 +3166,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let R_TUNNEL = 300, NUM_DUST = 180;
 
   // Reward transition constants
-  const REWARD_RUSH_MS = 600;
+  const REWARD_RUSH_MS = 340;
   const REWARD_BURST_MS = 450;
   const REWARD_IRIS_MS = 900;
   const RESUME_PRINT_STAGGER = 90;
@@ -3529,7 +3542,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scrollTo(0, Math.max(0, scrollTarget));
     if (ctrlLabel)      ctrlLabel.hidden = true;
     if (skipBtn)        skipBtn.hidden = true;
-    if (scrubWrap)      scrubWrap.hidden = true;
+    hideScrub();
     if (navWorkBtn)     navWorkBtn.hidden = false;
     if (navApproachBtn) navApproachBtn.hidden = false;
     isScrubbing = false;
@@ -3558,8 +3571,8 @@ document.addEventListener('DOMContentLoaded', () => {
     freezeBmp = null; rewardSparks = []; rewardShockwaves = [];
     if (ctrlLabel)      ctrlLabel.hidden = false;
     if (skipBtn)        skipBtn.hidden = false;
-    if (scrubWrap)      scrubWrap.hidden = false;
-    if (scrubEl)        { scrubEl.value = 0; scrubEl.min = 0; }
+    showScrub();
+    if (scrubEl)        { scrubEl.value = 0; scrubEl.min = 0; scrubEl.style.setProperty('--prog', 0); }
     isScrubbing = false; scrubMin = 0;
     if (navWorkBtn)     navWorkBtn.hidden = true;
     if (navApproachBtn) navApproachBtn.hidden = true;
@@ -3571,7 +3584,7 @@ document.addEventListener('DOMContentLoaded', () => {
     isRewardTransition = false;
     isScrubbing = false;
     cancelAnim();
-    if (scrubWrap) scrubWrap.hidden = true;
+    hideScrub();
     cvs.style.transition = 'opacity 0.25s ease'; cvs.style.opacity = '0';
     setTimeout(function() { showResumeMode(false); }, 300);
   }
@@ -3580,7 +3593,7 @@ document.addEventListener('DOMContentLoaded', () => {
     done = true;
     isRewardTransition = true;
     isScrubbing = false;
-    if (scrubWrap) scrubWrap.hidden = true;
+    hideScrub();
     cancelAnim();
     rewardStart = performance.now();
     freezeBmp = null;
@@ -3636,7 +3649,7 @@ document.addEventListener('DOMContentLoaded', () => {
       var rdt = Math.min((now - rushLastT) / 1000, 0.05);
       rushLastT = now;
       var rushT = el / REWARD_RUSH_MS;
-      var rushSpd = SPEED * (2.5 + rushT * 5.5);
+      var rushSpd = SPEED * (5.0 + rushT * 11.0);
 
       cameraZ += rushSpd * rdt;
 
@@ -4028,8 +4041,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isTunnelMode) { raf = 0; return; }
 
     if (!isScrubbing) cameraZ += spd*dt;
-    // Update slider (write only, no layout read)
-    if (scrubEl) scrubEl.value = Math.min(cameraZ / END_Z, 1);
+    // Update slider (write only, no layout read) — skip while user is dragging
+    if (scrubEl && !isScrubbing) {
+      var prog = Math.min(cameraZ / END_Z, 1);
+      scrubEl.value = prog;
+      scrubEl.style.setProperty('--prog', prog);
+    }
     drawBloom(now);
     drawHaze();
     ctx.lineCap = 'round';
@@ -4084,7 +4101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     drawMilestoneFX(now);
-    if (cameraZ >= END_Z) { startRewardTransition(); return; }
+    if (cameraZ >= END_Z && !isScrubbing) { startRewardTransition(); return; }
     raf = requestAnimationFrame(loop);
   }
 
@@ -4096,39 +4113,41 @@ document.addEventListener('DOMContentLoaded', () => {
   if (replayCtaBtn) replayCtaBtn.addEventListener('click', showTunnelMode);
 
   document.addEventListener('click', function() {
-    if (!isTunnelMode || done || isRewardTransition) return;
+    if (!isTunnelMode || done || isRewardTransition || isScrubbing) return;
     boostEnd = performance.now() + 500;
   }, { passive: true });
 
   // ── Scrub slider logic ──
   if (scrubEl) {
-    var scrubGrabHandler = function(e) {
+    scrubEl.addEventListener('pointerdown', function(e) {
       if (!isTunnelMode || done) return;
       isScrubbing = true;
       scrubMin = cameraZ / END_Z;
-      scrubEl.min = scrubMin;        // forward-only clamp
-      e.stopPropagation();           // don't trigger click-boost
-    };
-    scrubEl.addEventListener('pointerdown', scrubGrabHandler);
-    scrubEl.addEventListener('mousedown', scrubGrabHandler);
+      scrubEl.min = scrubMin;
+      e.stopPropagation();
+      // Do NOT preventDefault — that kills native range dragging
+    });
+
+    // Prevent click-boost from firing when tapping the slider
+    scrubEl.addEventListener('click', function(e) { e.stopPropagation(); });
 
     scrubEl.addEventListener('input', function() {
       if (!isScrubbing) return;
       var val = parseFloat(scrubEl.value);
-      if (val < scrubMin) val = scrubMin;
+      if (val < scrubMin) { val = scrubMin; scrubEl.value = val; }
       cameraZ = val * END_Z;
+      scrubEl.style.setProperty('--prog', val);
     });
 
-    var scrubReleaseHandler = function() {
+    var scrubRelease = function() {
       if (!isScrubbing) return;
       isScrubbing = false;
       scrubEl.min = 0;
-      if (cameraZ >= END_Z) { startRewardTransition(); }
+      if (cameraZ >= END_Z) startRewardTransition();
     };
-    scrubEl.addEventListener('pointerup', scrubReleaseHandler);
-    scrubEl.addEventListener('change', scrubReleaseHandler);
+    window.addEventListener('pointerup', scrubRelease);
+    window.addEventListener('pointercancel', scrubRelease);
 
-    // Prevent page scroll while dragging
     scrubEl.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
   }
 
@@ -4142,12 +4161,12 @@ document.addEventListener('DOMContentLoaded', () => {
     isTunnelMode = false;
     if (ctrlLabel)      ctrlLabel.hidden = true;
     if (skipBtn)        skipBtn.hidden = true;
-    if (scrubWrap)      scrubWrap.hidden = true;
+    if (scrubWrap)      { scrubWrap.hidden = true; scrubWrap.classList.add('scrub-out'); }
     if (replayCtaBtn)   replayCtaBtn.hidden = true;
     if (navWorkBtn)     navWorkBtn.hidden = false;
     if (navApproachBtn) navApproachBtn.hidden = false;
   } else {
-    if (scrubWrap) scrubWrap.hidden = false;
+    showScrub();
     initTunnel();
     startAnim();
   }
