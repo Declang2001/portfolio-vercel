@@ -4117,20 +4117,24 @@ document.addEventListener('DOMContentLoaded', () => {
     boostEnd = performance.now() + 500;
   }, { passive: true });
 
-  // ── Scrub slider logic ──
+  // ── Scrub slider logic (unified: let native range handle touch + mouse) ──
   if (scrubEl) {
+    // Prevent click-boost from firing when tapping the slider
+    scrubEl.addEventListener('click', function(e) { e.stopPropagation(); });
+
+    // Begin scrub on any interaction (touch or mouse).
+    // Do NOT preventDefault — let the native range handle thumb dragging.
+    // Do NOT setPointerCapture — breaks iOS Safari range inputs.
     scrubEl.addEventListener('pointerdown', function(e) {
       if (!isTunnelMode || done) return;
       isScrubbing = true;
       scrubMin = cameraZ / END_Z;
       scrubEl.min = scrubMin;
       e.stopPropagation();
-      // Do NOT preventDefault — that kills native range dragging
     });
 
-    // Prevent click-boost from firing when tapping the slider
-    scrubEl.addEventListener('click', function(e) { e.stopPropagation(); });
-
+    // Native input event fires on both mouse drag and touch drag of range inputs.
+    // This is the standard cross-browser way to read the value.
     scrubEl.addEventListener('input', function() {
       if (!isScrubbing) return;
       var val = parseFloat(scrubEl.value);
@@ -4139,6 +4143,7 @@ document.addEventListener('DOMContentLoaded', () => {
       scrubEl.style.setProperty('--prog', val);
     });
 
+    // Release: listen on window so it fires even if pointer/finger drifts off.
     var scrubRelease = function() {
       if (!isScrubbing) return;
       isScrubbing = false;
@@ -4147,8 +4152,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     window.addEventListener('pointerup', scrubRelease);
     window.addEventListener('pointercancel', scrubRelease);
-
-    scrubEl.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
   }
 
   buildNoiseTex();
