@@ -3133,12 +3133,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const replayCtaBtn   = document.getElementById('jReplayCta');
   const navWorkBtn     = document.getElementById('jNavWork');
   const navApproachBtn = document.getElementById('jNavApproach');
+  const scrubWrap = document.getElementById('journeyScrubWrap');
+  const scrubEl   = document.getElementById('journeyScrub');
   if (!cvs) return;
 
   const ctx = cvs.getContext('2d');
   let W = 0, H = 0, cx = 0, cy = 0, dpr = 1;
   let raf = 0, lastT = 0, elapsed = 0;
   let isTunnelMode = !reduced, done = false;
+  let isScrubbing = false, scrubMin = 0;
 
   const FOV = 500, NEAR = 14, FAR = 1800, SPEED = 65, END_Z = 1300;
   // Milestone phase durations (ms)
@@ -3150,8 +3153,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let R_TUNNEL = 300, NUM_DUST = 180;
 
   // Reward transition constants
+  const REWARD_RUSH_MS = 600;
+  const REWARD_BURST_MS = 450;
   const REWARD_IRIS_MS = 900;
-  const REWARD_BLOOM_MS = 650;
   const RESUME_PRINT_STAGGER = 90;
   const RESUME_PRINT_TOTAL = 650;
 
@@ -3160,6 +3164,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let noiseCvs = null, noisePat = null;
   let milestoneFX = null;
   let isRewardTransition = false, rewardStart = 0;
+  let freezeBmp = null, rewardSparks = [], rewardShockwaves = [];
 
   const NUM_RINGS = 28, NUM_STREAKS = 55;
 
@@ -3524,8 +3529,10 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scrollTo(0, Math.max(0, scrollTarget));
     if (ctrlLabel)      ctrlLabel.hidden = true;
     if (skipBtn)        skipBtn.hidden = true;
+    if (scrubWrap)      scrubWrap.hidden = true;
     if (navWorkBtn)     navWorkBtn.hidden = false;
     if (navApproachBtn) navApproachBtn.hidden = false;
+    isScrubbing = false;
     // Print-on cascade (reward only)
     if (printOn && !reduced) {
       resumeEl.classList.add('resume-print-on');
@@ -3547,9 +3554,13 @@ document.addEventListener('DOMContentLoaded', () => {
     resumeEl.hidden = true; highlightsEl.hidden = true;
     resumeEl.classList.remove('resume-print-on');
     cvs.hidden = false; cvs.style.transition = ''; cvs.style.opacity = '1';
-    milestoneFX = null; done = false;
+    milestoneFX = null; done = false; rushLastT = 0;
+    freezeBmp = null; rewardSparks = []; rewardShockwaves = [];
     if (ctrlLabel)      ctrlLabel.hidden = false;
     if (skipBtn)        skipBtn.hidden = false;
+    if (scrubWrap)      scrubWrap.hidden = false;
+    if (scrubEl)        { scrubEl.value = 0; scrubEl.min = 0; }
+    isScrubbing = false; scrubMin = 0;
     if (navWorkBtn)     navWorkBtn.hidden = true;
     if (navApproachBtn) navApproachBtn.hidden = true;
     initTunnel(); startAnim();
@@ -3558,71 +3569,278 @@ document.addEventListener('DOMContentLoaded', () => {
   function endAnimationFast() {
     done = true;
     isRewardTransition = false;
+    isScrubbing = false;
     cancelAnim();
+    if (scrubWrap) scrubWrap.hidden = true;
     cvs.style.transition = 'opacity 0.25s ease'; cvs.style.opacity = '0';
     setTimeout(function() { showResumeMode(false); }, 300);
   }
-  // Natural completion: start reward iris
+  // Natural completion: rush → burst → iris → resume
   function startRewardTransition() {
     done = true;
     isRewardTransition = true;
+    isScrubbing = false;
+    if (scrubWrap) scrubWrap.hidden = true;
+    cancelAnim();
     rewardStart = performance.now();
-    // Keep RAF running for iris draw
-    if (!raf) raf = requestAnimationFrame(rewardLoop);
+    freezeBmp = null;
+    rewardSparks = [];
+    rewardShockwaves = [];
+    rushLastT = 0;
+    raf = requestAnimationFrame(rewardLoop);
   }
-  // ── Reward iris render loop ──
+
+  function captureFreeze() {
+    var oc = document.createElement('canvas');
+    oc.width = W; oc.height = H;
+    oc.getContext('2d').drawImage(cvs, 0, 0);
+    return oc;
+  }
+
+  function initBurstFX() {
+    var i, a, spd;
+    // 3 shockwave rings
+    rewardShockwaves = [];
+    for (i = 0; i < 3; i++) {
+      rewardShockwaves.push({
+        delay: i * 80,
+        maxR: Math.hypot(W, H) * (0.35 + i * 0.12),
+        width: (3.5 - i * 0.8) * dpr,
+        purple: i > 0
+      });
+    }
+    // 40 spark streaklets
+    rewardSparks = [];
+    for (i = 0; i < 40; i++) {
+      a = Math.random() * Math.PI * 2;
+      spd = (120 + Math.random() * 280) * dpr;
+      rewardSparks.push({
+        angle: a, speed: spd,
+        len: (8 + Math.random() * 18) * dpr,
+        life: 0.5 + Math.random() * 0.5,
+        purple: Math.random() < 0.55,
+        width: (0.6 + Math.random() * 1.4) * dpr
+      });
+    }
+  }
+
+  // ── Reward render loop: rush → burst → iris → resume ──
+  var rushLastT = 0;
   function rewardLoop(now) {
     if (!isRewardTransition) { raf = 0; return; }
-    var t = Math.min((now - rewardStart) / REWARD_IRIS_MS, 1);
-    var ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    var el = now - rewardStart;
+
+    // ── Phase 1: Rush ──
+    if (el < REWARD_RUSH_MS) {
+      if (!rushLastT) rushLastT = now;
+      var rdt = Math.min((now - rushLastT) / 1000, 0.05);
+      rushLastT = now;
+      var rushT = el / REWARD_RUSH_MS;
+      var rushSpd = SPEED * (2.5 + rushT * 5.5);
+
+      cameraZ += rushSpd * rdt;
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, W, H);
+      drawBloom(now);
+      drawHaze();
+      ctx.lineCap = 'round';
+      var i, ring, streak, dp;
+      for (i = 0; i < rings.length; i++) {
+        ring = rings[i];
+        if (ring.z - cameraZ < NEAR) {
+          ring.z = cameraZ + FAR * (0.65 + Math.random() * 0.35);
+          ring.rFrac = 0.88 + Math.random() * 0.24;
+          ring.alpha = 0.08 + Math.random() * 0.10;
+        }
+        drawRing(ring);
+      }
+      ctx.lineCap = 'butt';
+      for (i = 0; i < streaks.length; i++) {
+        streak = streaks[i];
+        if (streak.z - cameraZ < NEAR) {
+          streak.angle = Math.random() * Math.PI * 2;
+          streak.frac = Math.random() * 1.15;
+          streak.z = cameraZ + FAR * (0.5 + Math.random() * 0.5);
+        }
+        drawStreak(streak, rushSpd, rdt);
+      }
+      for (i = 0; i < dust.length; i++) {
+        dp = dust[i];
+        if (dp.z - cameraZ < NEAR) {
+          dp.angle = Math.random() * Math.PI * 2;
+          dp.frac = Math.random() < 0.22 ? Math.random() * 0.32 : 0.5 + Math.random() * 0.65;
+          dp.z = cameraZ + NEAR + Math.random() * (FAR * (dp.layer === 2 ? 1.0 : dp.layer === 1 ? 0.75 : 0.45));
+          dp.purple = Math.random() < 0.52;
+        }
+        drawDust(dp, rushSpd, rdt);
+      }
+      ctx.lineCap = 'round';
+      drawPulseRings(now);
+      ctx.globalAlpha = 1;
+
+      // At end of rush, capture freeze + init burst
+      if (el + 16 >= REWARD_RUSH_MS && !freezeBmp) {
+        freezeBmp = captureFreeze();
+        initBurstFX();
+      }
+
+      raf = requestAnimationFrame(rewardLoop);
+      return;
+    }
+
+    // Ensure freeze captured (safety)
+    if (!freezeBmp) { freezeBmp = captureFreeze(); initBurstFX(); }
+    rushLastT = 0;
+
+    // ── Phase 2: Burst (explosion overlays on freeze frame) ──
+    var burstEl = el - REWARD_RUSH_MS;
+    if (burstEl < REWARD_BURST_MS) {
+      var bt = burstEl / REWARD_BURST_MS; // 0→1
+
+      // Jitter offset (subtle camera shake)
+      var jx = (Math.random() - 0.5) * 3.0 * dpr * (1 - bt);
+      var jy = (Math.random() - 0.5) * 3.0 * dpr * (1 - bt);
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      ctx.translate(jx, jy);
+      ctx.drawImage(freezeBmp, 0, 0);
+      ctx.restore();
+
+      // Purple bloom — peaks at ~30%, fades out
+      var bloomA = Math.sin(bt * Math.PI) * 0.38;
+      if (bloomA > 0.005) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = bloomA;
+        var bR = Math.hypot(W, H) * (0.25 + bt * 0.35);
+        var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, bR);
+        grad.addColorStop(0, 'rgba(200,140,255,0.8)');
+        grad.addColorStop(0.4, 'rgba(168,85,247,0.35)');
+        grad.addColorStop(1, 'rgba(100,30,200,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
+
+      // White core flash (brief)
+      if (bt < 0.25) {
+        var flashA = (1 - bt / 0.25) * 0.22;
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = flashA;
+        var fR = Math.hypot(W, H) * 0.18;
+        var fg = ctx.createRadialGradient(cx, cy, 0, cx, cy, fR);
+        fg.addColorStop(0, 'rgba(255,255,255,0.9)');
+        fg.addColorStop(0.5, 'rgba(220,200,255,0.3)');
+        fg.addColorStop(1, 'rgba(168,85,247,0)');
+        ctx.fillStyle = fg;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
+
+      // Shockwave rings
+      var si, sw, swT, swR, swA;
+      for (si = 0; si < rewardShockwaves.length; si++) {
+        sw = rewardShockwaves[si];
+        swT = (burstEl - sw.delay) / (REWARD_BURST_MS - sw.delay);
+        if (swT < 0 || swT > 1) continue;
+        var swEase = 1 - Math.pow(1 - swT, 2);
+        swR = sw.maxR * swEase;
+        swA = (1 - swT) * 0.55;
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = swA;
+        ctx.lineWidth = sw.width * (1 - swT * 0.6);
+        ctx.strokeStyle = sw.purple ? 'rgba(168,85,247,1)' : 'rgba(230,210,255,1)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.max(swR, 1), 0, Math.PI * 2);
+        ctx.stroke();
+        // Soft outer glow
+        if (sw.width > 2) {
+          ctx.globalAlpha = swA * 0.3;
+          ctx.lineWidth = sw.width * 3 * (1 - swT * 0.5);
+          ctx.strokeStyle = 'rgba(168,85,247,0.4)';
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.max(swR, 1), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // Spark streaklets
+      var sp, spT, spDist, spA, spX, spY, spTailX, spTailY;
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      for (si = 0; si < rewardSparks.length; si++) {
+        sp = rewardSparks[si];
+        spT = bt / sp.life;
+        if (spT > 1) continue;
+        spA = (1 - spT) * 0.7;
+        spDist = sp.speed * bt;
+        spX = cx + Math.cos(sp.angle) * spDist;
+        spY = cy + Math.sin(sp.angle) * spDist;
+        spTailX = spX - Math.cos(sp.angle) * sp.len * (1 - spT * 0.5);
+        spTailY = spY - Math.sin(sp.angle) * sp.len * (1 - spT * 0.5);
+        ctx.globalAlpha = spA;
+        ctx.strokeStyle = sp.purple ? 'rgba(190,120,255,1)' : 'rgba(255,240,255,1)';
+        ctx.lineWidth = sp.width * (1 - spT * 0.6);
+        ctx.beginPath();
+        ctx.moveTo(spTailX, spTailY);
+        ctx.lineTo(spX, spY);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+
+      raf = requestAnimationFrame(rewardLoop);
+      return;
+    }
+
+    // ── Phase 3: Iris close ──
+    var irisEl = el - REWARD_RUSH_MS - REWARD_BURST_MS;
+    var t = Math.min(irisEl / REWARD_IRIS_MS, 1);
+    var ease = 1 - Math.pow(1 - t, 3);
     var maxR = Math.hypot(W, H) * 0.6;
     var radius = maxR * (1 - ease);
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(freezeBmp, 0, 0);
 
-    // Redraw last tunnel frame (rings, streaks, dust frozen — no cameraZ advance)
-    drawBloom(now);
-    drawHaze();
-    ctx.lineCap = 'round';
-    var i;
-    for (i = 0; i < rings.length; i++) drawRing(rings[i]);
-    ctx.lineCap = 'butt';
-    for (i = 0; i < streaks.length; i++) drawStreak(streaks[i], 0, 0);
-    for (i = 0; i < dust.length; i++) drawDust(dust[i], 0, 0);
-    ctx.lineCap = 'round';
-    drawPulseRings(now);
-    ctx.globalAlpha = 1;
-
-    // ── Iris overlay: black with circular cutout ──
-    // Draw full black
+    // Iris: black overlay with circular cutout
     ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = '#000';
     ctx.globalAlpha = 1;
     ctx.fillRect(0, 0, W, H);
-    // Punch circle hole
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
     ctx.arc(cx, cy, Math.max(radius, 0), 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    // ── Purple bloom during iris ──
-    var bloomT = Math.min((now - rewardStart) / REWARD_BLOOM_MS, 1);
-    var bloomA = Math.sin(bloomT * Math.PI) * 0.25;
-    if (bloomA > 0.005) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = bloomA;
-      var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius + 60 * dpr);
-      grad.addColorStop(0, 'rgba(168,85,247,0.7)');
-      grad.addColorStop(0.5, 'rgba(168,85,247,0.25)');
-      grad.addColorStop(1, 'rgba(168,85,247,0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, W, H);
-      ctx.restore();
+    // Soft purple glow inside iris
+    if (radius > 5) {
+      var iBloom = Math.sin(t * Math.PI) * 0.18;
+      if (iBloom > 0.005) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = iBloom;
+        var ig = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        ig.addColorStop(0, 'rgba(168,85,247,0.6)');
+        ig.addColorStop(0.6, 'rgba(168,85,247,0.15)');
+        ig.addColorStop(1, 'rgba(168,85,247,0)');
+        ctx.fillStyle = ig;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
     }
 
     ctx.globalCompositeOperation = 'source-over';
@@ -3630,6 +3848,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (t >= 1) {
       isRewardTransition = false;
+      freezeBmp = null;
       raf = 0;
       showResumeMode(true);
       return;
@@ -3808,7 +4027,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.clearRect(0,0,W,H);
     if (!isTunnelMode) { raf = 0; return; }
 
-    cameraZ += spd*dt;
+    if (!isScrubbing) cameraZ += spd*dt;
+    // Update slider (write only, no layout read)
+    if (scrubEl) scrubEl.value = Math.min(cameraZ / END_Z, 1);
     drawBloom(now);
     drawHaze();
     ctx.lineCap = 'round';
@@ -3879,6 +4100,38 @@ document.addEventListener('DOMContentLoaded', () => {
     boostEnd = performance.now() + 500;
   }, { passive: true });
 
+  // ── Scrub slider logic ──
+  if (scrubEl) {
+    var scrubGrabHandler = function(e) {
+      if (!isTunnelMode || done) return;
+      isScrubbing = true;
+      scrubMin = cameraZ / END_Z;
+      scrubEl.min = scrubMin;        // forward-only clamp
+      e.stopPropagation();           // don't trigger click-boost
+    };
+    scrubEl.addEventListener('pointerdown', scrubGrabHandler);
+    scrubEl.addEventListener('mousedown', scrubGrabHandler);
+
+    scrubEl.addEventListener('input', function() {
+      if (!isScrubbing) return;
+      var val = parseFloat(scrubEl.value);
+      if (val < scrubMin) val = scrubMin;
+      cameraZ = val * END_Z;
+    });
+
+    var scrubReleaseHandler = function() {
+      if (!isScrubbing) return;
+      isScrubbing = false;
+      scrubEl.min = 0;
+      if (cameraZ >= END_Z) { startRewardTransition(); }
+    };
+    scrubEl.addEventListener('pointerup', scrubReleaseHandler);
+    scrubEl.addEventListener('change', scrubReleaseHandler);
+
+    // Prevent page scroll while dragging
+    scrubEl.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
+  }
+
   buildNoiseTex();
   resize();
   window.addEventListener('resize', resize, { passive: true });
@@ -3889,10 +4142,12 @@ document.addEventListener('DOMContentLoaded', () => {
     isTunnelMode = false;
     if (ctrlLabel)      ctrlLabel.hidden = true;
     if (skipBtn)        skipBtn.hidden = true;
+    if (scrubWrap)      scrubWrap.hidden = true;
     if (replayCtaBtn)   replayCtaBtn.hidden = true;
     if (navWorkBtn)     navWorkBtn.hidden = false;
     if (navApproachBtn) navApproachBtn.hidden = false;
   } else {
+    if (scrubWrap) scrubWrap.hidden = false;
     initTunnel();
     startAnim();
   }
