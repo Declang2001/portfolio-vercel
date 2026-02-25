@@ -3127,10 +3127,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const cardLine  = document.getElementById('jCardLine');
   const cardTags  = document.getElementById('jCardTags');
   const resumeEl  = document.getElementById('journeyResume');
-  const timelineEl= document.getElementById('journeyTimeline');
   const highlightsEl = document.getElementById('journeyHighlights');
   const skipBtn   = document.getElementById('jSkip');
-  const resumeBtn = document.getElementById('jResume');
+  const ctrlLabel = document.getElementById('jCtrlLabel');
   const replayCtaBtn   = document.getElementById('jReplayCta');
   const navWorkBtn     = document.getElementById('jNavWork');
   const navApproachBtn = document.getElementById('jNavApproach');
@@ -3150,10 +3149,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const REVEAL_RAMP = 180; // fade-in ramp for each staged element
   let R_TUNNEL = 300, NUM_DUST = 180;
 
+  // Reward transition constants
+  const REWARD_IRIS_MS = 900;
+  const REWARD_BLOOM_MS = 650;
+  const RESUME_PRINT_STAGGER = 90;
+  const RESUME_PRINT_TOTAL = 650;
+
   let cameraZ = 0, rings = [], streaks = [], dust = [], pulseRings = [], msDone = [];
   let boostEnd = 0, boostMul = 1, bloomStart = 0;
   let noiseCvs = null, noisePat = null;
   let milestoneFX = null;
+  let isRewardTransition = false, rewardStart = 0;
 
   const NUM_RINGS = 28, NUM_STREAKS = 55;
 
@@ -3205,21 +3211,6 @@ document.addEventListener('DOMContentLoaded', () => {
     for (i = 0; i < NUM_RINGS;   i++) rings.push(makeRing(NEAR + (i/NUM_RINGS)*(FAR-NEAR)));
     for (i = 0; i < NUM_STREAKS; i++) streaks.push(makeStreak());
     for (i = 0; i < NUM_DUST;    i++) dust.push(makeDust());
-  }
-
-  function buildTimeline() {
-    timelineEl.innerHTML = '';
-    MILESTONES.forEach(function(m) {
-      var li = document.createElement('li');
-      li.className = 'journey-timeline-item';
-      li.innerHTML = '<div class="journey-timeline-year">'+m.year+'</div>'+
-        '<div class="journey-timeline-title">'+m.title+'</div>'+
-        '<div class="journey-timeline-desc">'+m.oneLine+'</div>'+
-        '<div class="journey-timeline-tags">'+
-        m.tags.map(function(t){return '<span class="journey-timeline-tag">'+t+'</span>';}).join('')+
-        '</div>';
-      timelineEl.appendChild(li);
-    });
   }
 
   function resize() {
@@ -3521,31 +3512,130 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.globalAlpha = 1;
   }
 
-  function showResumeMode() {
-    isTunnelMode = false; cancelAnim();
-    cvs.style.transition = 'opacity 0.25s ease'; cvs.style.opacity = '0';
-    setTimeout(function(){ cvs.hidden = true; }, 300);
+  // ── Show resume (shared final step for both skip and reward) ──
+  function showResumeMode(printOn) {
+    isTunnelMode = false;
+    isRewardTransition = false;
     milestoneFX = null;
+    cvs.hidden = true;
+    cvs.style.transition = ''; cvs.style.opacity = '1';
     resumeEl.hidden = false; highlightsEl.hidden = false;
     var scrollTarget = (resumeEl.offsetTop||0) - 80;
     window.scrollTo(0, Math.max(0, scrollTarget));
-    if (resumeBtn)      resumeBtn.hidden = true;
+    if (ctrlLabel)      ctrlLabel.hidden = true;
     if (skipBtn)        skipBtn.hidden = true;
     if (navWorkBtn)     navWorkBtn.hidden = false;
     if (navApproachBtn) navApproachBtn.hidden = false;
+    // Print-on cascade (reward only)
+    if (printOn && !reduced) {
+      resumeEl.classList.add('resume-print-on');
+      var header = resumeEl.querySelector('.resume-header');
+      if (header) header.style.setProperty('--d', '0ms');
+      var panels = resumeEl.querySelectorAll('.resume-panel');
+      for (var i = 0; i < panels.length; i++) {
+        panels[i].style.setProperty('--d', (120 + i * RESUME_PRINT_STAGGER) + 'ms');
+      }
+      var bottom = resumeEl.querySelector('.resume-bottom');
+      if (bottom) bottom.style.setProperty('--d', (120 + panels.length * RESUME_PRINT_STAGGER) + 'ms');
+      var totalMs = 120 + panels.length * RESUME_PRINT_STAGGER + 480 + 100;
+      setTimeout(function() { resumeEl.classList.remove('resume-print-on'); }, totalMs);
+    }
   }
   function showTunnelMode() {
     isTunnelMode = true;
+    isRewardTransition = false;
     resumeEl.hidden = true; highlightsEl.hidden = true;
+    resumeEl.classList.remove('resume-print-on');
     cvs.hidden = false; cvs.style.transition = ''; cvs.style.opacity = '1';
     milestoneFX = null; done = false;
-    if (resumeBtn)      { resumeBtn.textContent = 'resume mode'; resumeBtn.hidden = false; }
+    if (ctrlLabel)      ctrlLabel.hidden = false;
     if (skipBtn)        skipBtn.hidden = false;
     if (navWorkBtn)     navWorkBtn.hidden = true;
     if (navApproachBtn) navApproachBtn.hidden = true;
     initTunnel(); startAnim();
   }
-  function endAnimation() { done = true; showResumeMode(); }
+  // Skip: fast fade, no reward
+  function endAnimationFast() {
+    done = true;
+    isRewardTransition = false;
+    cancelAnim();
+    cvs.style.transition = 'opacity 0.25s ease'; cvs.style.opacity = '0';
+    setTimeout(function() { showResumeMode(false); }, 300);
+  }
+  // Natural completion: start reward iris
+  function startRewardTransition() {
+    done = true;
+    isRewardTransition = true;
+    rewardStart = performance.now();
+    // Keep RAF running for iris draw
+    if (!raf) raf = requestAnimationFrame(rewardLoop);
+  }
+  // ── Reward iris render loop ──
+  function rewardLoop(now) {
+    if (!isRewardTransition) { raf = 0; return; }
+    var t = Math.min((now - rewardStart) / REWARD_IRIS_MS, 1);
+    var ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    var maxR = Math.hypot(W, H) * 0.6;
+    var radius = maxR * (1 - ease);
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, W, H);
+
+    // Redraw last tunnel frame (rings, streaks, dust frozen — no cameraZ advance)
+    drawBloom(now);
+    drawHaze();
+    ctx.lineCap = 'round';
+    var i;
+    for (i = 0; i < rings.length; i++) drawRing(rings[i]);
+    ctx.lineCap = 'butt';
+    for (i = 0; i < streaks.length; i++) drawStreak(streaks[i], 0, 0);
+    for (i = 0; i < dust.length; i++) drawDust(dust[i], 0, 0);
+    ctx.lineCap = 'round';
+    drawPulseRings(now);
+    ctx.globalAlpha = 1;
+
+    // ── Iris overlay: black with circular cutout ──
+    // Draw full black
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#000';
+    ctx.globalAlpha = 1;
+    ctx.fillRect(0, 0, W, H);
+    // Punch circle hole
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(radius, 0), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // ── Purple bloom during iris ──
+    var bloomT = Math.min((now - rewardStart) / REWARD_BLOOM_MS, 1);
+    var bloomA = Math.sin(bloomT * Math.PI) * 0.25;
+    if (bloomA > 0.005) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = bloomA;
+      var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius + 60 * dpr);
+      grad.addColorStop(0, 'rgba(168,85,247,0.7)');
+      grad.addColorStop(0.5, 'rgba(168,85,247,0.25)');
+      grad.addColorStop(1, 'rgba(168,85,247,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+
+    if (t >= 1) {
+      isRewardTransition = false;
+      raf = 0;
+      showResumeMode(true);
+      return;
+    }
+    raf = requestAnimationFrame(rewardLoop);
+  }
   function cancelAnim() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
   function startAnim()  { cancelAnim(); raf = requestAnimationFrame(loop); }
 
@@ -3773,22 +3863,22 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     drawMilestoneFX(now);
-    if (cameraZ >= END_Z) { endAnimation(); return; }
+    if (cameraZ >= END_Z) { startRewardTransition(); return; }
     raf = requestAnimationFrame(loop);
   }
 
-  if (skipBtn)   skipBtn.addEventListener('click', endAnimation);
-  if (resumeBtn) resumeBtn.addEventListener('click', function() {
-    if (isTunnelMode) showResumeMode(); else showTunnelMode();
+  if (skipBtn) skipBtn.addEventListener('click', function() {
+    // Cancel reward if in progress, or skip from tunnel
+    if (isRewardTransition) { isRewardTransition = false; cancelAnim(); showResumeMode(false); }
+    else { endAnimationFast(); }
   });
   if (replayCtaBtn) replayCtaBtn.addEventListener('click', showTunnelMode);
 
   document.addEventListener('click', function() {
-    if (!isTunnelMode || done) return;
+    if (!isTunnelMode || done || isRewardTransition) return;
     boostEnd = performance.now() + 500;
   }, { passive: true });
 
-  buildTimeline();
   buildNoiseTex();
   resize();
   window.addEventListener('resize', resize, { passive: true });
@@ -3797,8 +3887,8 @@ document.addEventListener('DOMContentLoaded', () => {
     cvs.hidden = true;
     resumeEl.hidden = false; highlightsEl.hidden = false;
     isTunnelMode = false;
+    if (ctrlLabel)      ctrlLabel.hidden = true;
     if (skipBtn)        skipBtn.hidden = true;
-    if (resumeBtn)      resumeBtn.hidden = true;
     if (replayCtaBtn)   replayCtaBtn.hidden = true;
     if (navWorkBtn)     navWorkBtn.hidden = false;
     if (navApproachBtn) navApproachBtn.hidden = false;

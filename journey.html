@@ -37,6 +37,16 @@
       box-shadow: 0 0 24px rgba(168,85,247,0.18), 0 0 60px rgba(168,85,247,0.08);
       max-width: calc(100vw - 2rem);
     }
+    .journey-ctrl-label {
+      color: rgba(255,255,255,0.40);
+      font-size: 0.88rem;
+      letter-spacing: 0.12em;
+      padding: 0 0.6rem 0 1.1rem;
+      text-transform: lowercase;
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+    }
     .journey-ctrl-btn {
       border: none;
       border-radius: 999px;
@@ -114,189 +124,335 @@
       color: rgba(168,85,247,0.80);
     }
 
-    /* Resume mode */
+    /* ── Resume mode ── */
     .journey-resume {
       position: relative;
       z-index: 10;
-      max-width: 740px;
+      max-width: 1080px;
       margin: 0 auto;
-      padding: calc(var(--header-height, 64px) + 5rem) 2rem 4rem;
+      padding: calc(var(--header-height, 64px) + 3.5rem) 1.5rem 5rem;
+      text-transform: lowercase;
     }
-    .journey-section-label {
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.35);
-      margin-bottom: 2rem;
-      display: block;
+    /* Safe wrapping — no truncation, no ellipsis, ever */
+    .journey-resume *,
+    .journey-highlights * {
+      overflow-wrap: anywhere;
+      word-break: normal;
+      white-space: normal;
+      text-overflow: clip;
     }
-    .journey-timeline {
-      list-style: none;
-      padding: 0;
-      border-left: 1px solid rgba(168,85,247,0.2);
-      margin-left: 0.5rem;
+    /* Preserve casing on emails, urls, proper nouns where needed */
+    .resume-contact a,
+    .resume-contact-row a { text-transform: none; }
+
+    /* ── Resume header ── */
+    .resume-header {
+      text-align: center;
+      margin-bottom: clamp(2rem, 4vw, 3rem);
+      padding-bottom: clamp(1.8rem, 3.5vw, 2.6rem);
+      border-bottom: 1px solid rgba(168,85,247,0.15);
     }
-    .journey-timeline-item {
-      position: relative;
-      padding: 0 0 2.2rem 2rem;
-    }
-    .journey-timeline-item::before {
-      content: '';
-      position: absolute;
-      left: -5px;
-      top: 0.4rem;
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: var(--accent, rgb(168,85,247));
-      box-shadow: 0 0 10px rgba(168,85,247,0.5);
-    }
-    .journey-timeline-year {
-      font-size: 0.67rem;
-      letter-spacing: 0.13em;
-      text-transform: uppercase;
-      color: var(--accent, rgb(168,85,247));
-      margin-bottom: 0.25rem;
-    }
-    .journey-timeline-title {
-      font-size: 1.18rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 0.3rem;
-      line-height: 1.3;
-    }
-    .journey-timeline-desc {
-      font-size: 0.84rem;
-      color: rgba(255,255,255,0.62);
-      line-height: 1.6;
+    .resume-name-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 1rem;
       margin-bottom: 0.55rem;
     }
-    .journey-timeline-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.3rem;
+    .resume-name-spacer,
+    .journey-replay-sm {
+      flex: 0 0 auto;
+      width: 5.2rem; /* match replay pill width so name stays centered */
     }
-    .journey-timeline-tag {
-      font-size: 0.63rem;
-      letter-spacing: 0.08em;
-      padding: 0.15rem 0.42rem;
-      border: 1px solid rgba(168,85,247,0.32);
-      border-radius: 999px;
-      color: rgba(168,85,247,0.72);
+    .resume-name-spacer {
+      visibility: hidden;
+      pointer-events: none;
+      height: 0;
+      overflow: hidden;
     }
-
-    /* Highlights */
-    .journey-highlights {
-      position: relative;
-      z-index: 10;
-      max-width: 740px;
-      margin: 0 auto;
-      padding: 1rem 2rem 5rem;
-      border-top: 1px solid rgba(255,255,255,0.07);
-    }
-    .journey-highlights-heading {
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.35);
-      margin-bottom: 1.5rem;
-      display: block;
-    }
-    .journey-strengths {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.55rem 2rem;
-      margin-bottom: 2.5rem;
-      list-style: none;
-      padding: 0;
-    }
-    .journey-strengths li {
-      font-size: 0.86rem;
-      color: rgba(255,255,255,0.72);
-      padding-left: 1.1rem;
-      position: relative;
-      line-height: 1.45;
-    }
-    .journey-strengths li::before {
-      content: '→';
-      position: absolute;
-      left: 0;
-      color: var(--accent, rgb(168,85,247));
-      font-size: 0.72rem;
-      top: 0.1em;
-    }
-    .journey-tools {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-      margin-bottom: 2.5rem;
-      list-style: none;
-      padding: 0;
-    }
-    .journey-tools li {
-      font-size: 0.73rem;
-      letter-spacing: 0.09em;
-      padding: 0.28rem 0.75rem;
-      border: 1px solid rgba(255,255,255,0.13);
-      border-radius: 999px;
-      color: rgba(255,255,255,0.55);
-    }
-    .journey-cta-btn {
-      display: inline-block;
-      padding: 0.62rem 2rem;
-      border: 1px solid rgba(168,85,247,0.55);
-      border-radius: 999px;
-      color: rgba(168,85,247,0.9);
-      font-size: 0.78rem;
-      letter-spacing: 0.15em;
-      text-decoration: none;
-      text-transform: lowercase;
-      transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease;
-    }
-    .journey-cta-btn:hover,
-    .journey-cta-btn:focus-visible {
-      background: rgba(168,85,247,0.12);
-      border-color: rgba(168,85,247,0.85);
+    .resume-name {
+      font-size: clamp(2.6rem, 6.5vw, 4.2rem);
+      font-weight: 700;
       color: #fff;
-      outline: none;
-    }
-    .journey-top-bar {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: 1.5rem;
+      letter-spacing: -0.01em;
+      line-height: 1.08;
+      margin: 0;
     }
     .journey-replay-sm {
       font: inherit;
-      font-size: 0.68rem;
+      font-size: 0.72rem;
       letter-spacing: 0.12em;
-      padding: 0.3rem 0.85rem;
-      border: 1px solid rgba(168,85,247,0.45);
+      padding: 0.32rem 0.9rem;
+      border: 1px solid rgba(255,255,255,0.30);
       border-radius: 999px;
-      color: rgba(168,85,247,0.85);
+      color: rgba(255,255,255,0.72);
       background: transparent;
       cursor: pointer;
       text-transform: lowercase;
       transition: border-color 0.2s, color 0.2s;
+      text-align: center;
+      box-sizing: border-box;
     }
     .journey-replay-sm:hover,
     .journey-replay-sm:focus-visible {
-      border-color: rgba(168,85,247,0.85);
-      color: #fff;
+      border-color: var(--accent, #a855f7);
+      color: var(--accent, #a855f7);
       outline: none;
     }
+    .resume-title {
+      font-size: clamp(0.92rem, 2vw, 1.14rem);
+      color: var(--accent, #a855f7);
+      letter-spacing: 0.06em;
+      margin-bottom: 1.3rem;
+      line-height: 1.5;
+    }
+    .resume-contact-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.2rem 0;
+      font-size: clamp(0.8rem, 1.5vw, 0.9rem);
+      color: rgba(255,255,255,0.50);
+      margin-bottom: 0.35rem;
+      line-height: 1.6;
+    }
+    .resume-contact-row a {
+      color: rgba(255,255,255,0.72);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .resume-contact-row a:hover { color: var(--accent, #a855f7); }
+    .resume-sep {
+      margin: 0 0.55rem;
+      color: rgba(255,255,255,0.22);
+    }
 
+    /* ── Two-column body ── */
+    .resume-body {
+      display: grid;
+      grid-template-columns: 1fr 1.8fr;
+      gap: clamp(1.8rem, 3.5vw, 3rem);
+    }
+
+    /* ── Glass panel treatment ── */
+    .resume-panel {
+      background: rgba(8,8,14,0.50);
+      border: 1px solid rgba(168,85,247,0.12);
+      border-radius: 14px;
+      padding: clamp(1.5rem, 3vw, 2.2rem);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+    }
+
+    /* ── Section labels ── */
+    .resume-label {
+      font-size: clamp(0.64rem, 1.2vw, 0.74rem);
+      letter-spacing: 0.20em;
+      text-transform: lowercase;
+      color: var(--accent, #a855f7);
+      margin-bottom: clamp(0.9rem, 1.8vw, 1.2rem);
+      display: block;
+      opacity: 0.9;
+    }
+
+    /* ── Summary ── */
+    .resume-summary {
+      font-size: clamp(0.92rem, 1.7vw, 1.06rem);
+      color: rgba(255,255,255,0.66);
+      line-height: 1.78;
+      margin-bottom: 0;
+    }
+
+    /* ── Chip lists (skills + tools) ── */
+    .resume-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.38rem;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .resume-chips li {
+      font-size: clamp(0.70rem, 1.3vw, 0.78rem);
+      letter-spacing: 0.05em;
+      padding: 0.25rem 0.72rem;
+      border: 1px solid rgba(168,85,247,0.25);
+      border-radius: 999px;
+      color: rgba(255,255,255,0.60);
+      line-height: 1.4;
+    }
+    .resume-chips-sub {
+      font-size: clamp(0.66rem, 1.1vw, 0.72rem);
+      color: rgba(255,255,255,0.35);
+      margin-top: 0.5rem;
+      display: block;
+    }
+
+    /* ── Left column sections spacing ── */
+    .resume-left .resume-panel + .resume-panel {
+      margin-top: clamp(0.9rem, 1.8vw, 1.3rem);
+    }
+
+    /* ── Experience timeline ── */
+    .resume-exp-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      border-left: 2px solid rgba(168,85,247,0.20);
+      margin-left: 0.35rem;
+    }
+    .resume-exp-item {
+      position: relative;
+      padding: 0 0 clamp(2rem, 4vw, 3rem) 1.8rem;
+    }
+    .resume-exp-item:last-child { padding-bottom: 0; }
+    .resume-exp-item::before {
+      content: '';
+      position: absolute;
+      left: -5.5px;
+      top: 0.5rem;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent, #a855f7);
+      box-shadow: 0 0 10px rgba(168,85,247,0.45);
+    }
+    .resume-exp-org {
+      font-size: clamp(1.08rem, 2.1vw, 1.28rem);
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+      margin-bottom: 0.12rem;
+    }
+    .resume-exp-meta {
+      font-size: clamp(0.78rem, 1.4vw, 0.88rem);
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.03em;
+      margin-bottom: 0.15rem;
+      line-height: 1.45;
+    }
+    .resume-exp-date {
+      font-size: clamp(0.70rem, 1.2vw, 0.78rem);
+      letter-spacing: 0.10em;
+      color: var(--accent, #a855f7);
+      margin-bottom: 0.6rem;
+      opacity: 0.85;
+    }
+    .resume-exp-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .resume-exp-bullets li {
+      font-size: clamp(0.88rem, 1.6vw, 1rem);
+      color: rgba(255,255,255,0.60);
+      line-height: 1.7;
+      padding-left: 1.1rem;
+      position: relative;
+      margin-bottom: 0.35rem;
+    }
+    .resume-exp-bullets li:last-child { margin-bottom: 0; }
+    .resume-exp-bullets li::before {
+      content: '–';
+      position: absolute;
+      left: 0;
+      color: rgba(168,85,247,0.55);
+    }
+
+    /* ── Bottom row: education + projects side by side ── */
+    .resume-bottom {
+      display: grid;
+      grid-template-columns: 1fr 1.8fr;
+      gap: clamp(1.8rem, 3.5vw, 3rem);
+      margin-top: clamp(0.9rem, 1.8vw, 1.3rem);
+    }
+
+    /* ── Projects ── */
+    .resume-project-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .resume-project-list li {
+      font-size: clamp(0.86rem, 1.5vw, 0.96rem);
+      color: rgba(255,255,255,0.55);
+      line-height: 1.6;
+      padding-left: 1.1rem;
+      position: relative;
+      margin-bottom: 0.3rem;
+    }
+    .resume-project-list li:last-child { margin-bottom: 0; }
+    .resume-project-list li::before {
+      content: '–';
+      position: absolute;
+      left: 0;
+      color: rgba(168,85,247,0.45);
+    }
+
+    /* ── Education ── */
+    .resume-edu-org {
+      font-size: clamp(1.02rem, 1.9vw, 1.18rem);
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.35;
+      margin-bottom: 0.12rem;
+    }
+    .resume-edu-detail {
+      font-size: clamp(0.86rem, 1.5vw, 0.98rem);
+      color: rgba(255,255,255,0.55);
+      line-height: 1.6;
+      margin-bottom: 0.25rem;
+    }
+
+    /* ── Highlights (kept as sibling for JS show/hide) ── */
+    .journey-highlights {
+      position: relative;
+      z-index: 10;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 1.5rem 5rem;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .resume-body { grid-template-columns: 1fr; }
+      .resume-bottom { grid-template-columns: 1fr; }
+      .journey-resume { padding-left: 1.1rem; padding-right: 1.1rem; }
+      .journey-highlights { padding-left: 1.1rem; padding-right: 1.1rem; }
+      .resume-contact-row { gap: 0.15rem 0; }
+      .resume-name-spacer { display: none; }
+    }
     @media (max-width: 600px) {
-      .journey-strengths { grid-template-columns: 1fr; }
-      .journey-resume, .journey-highlights { padding-left: 1.25rem; padding-right: 1.25rem; }
       .journey-ctrl-btn { font-size: 0.88rem; padding: 0.82rem 1.15rem; min-height: 46px; }
       .journey-card { width: clamp(280px, 90vw, 400px); }
     }
 
+    /* ── Resume print-on reveal (reward transition only) ── */
+    @keyframes resumeIn {
+      from { opacity: 0; transform: translateY(12px); filter: blur(6px); }
+      to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+    }
+    #journeyResume.resume-print-on .resume-header,
+    #journeyResume.resume-print-on .resume-panel,
+    #journeyResume.resume-print-on .resume-bottom {
+      opacity: 0;
+      animation: resumeIn 480ms ease forwards;
+      animation-delay: var(--d, 0ms);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .journey-card,
-      .journey-cta-btn,
       .journey-ctrl-btn,
-      .journey-replay-sm { transition: none; }
+      .journey-replay-sm,
+      .resume-contact-row a { transition: none; }
+      #journeyResume.resume-print-on .resume-header,
+      #journeyResume.resume-print-on .resume-panel,
+      #journeyResume.resume-print-on .resume-bottom {
+        animation: none;
+        opacity: 1;
+        filter: none;
+        transform: none;
+      }
     }
   </style>
 </head>
@@ -318,8 +474,8 @@
 
   <!-- Controls (always visible during tunnel mode) -->
   <div class="journey-controls" id="journeyControls" role="toolbar" aria-label="Journey controls">
+    <span class="journey-ctrl-label" id="jCtrlLabel">the journey</span>
     <button class="journey-ctrl-btn" id="jSkip">skip</button>
-    <button class="journey-ctrl-btn" id="jResume">resume mode</button>
     <a class="journey-ctrl-btn" id="jNavWork" href="index.html#services" hidden>work</a>
     <a class="journey-ctrl-btn" id="jNavApproach" href="approach.html" hidden>approach</a>
   </div>
@@ -333,38 +489,138 @@
   </div>
 
   <main>
-    <!-- Resume mode: static timeline -->
     <div class="journey-resume" id="journeyResume" hidden>
-      <div class="journey-top-bar" id="journeyTopBar">
-        <span class="journey-section-label" style="flex:1;margin-bottom:0">the journey</span>
-        <button type="button" class="journey-replay-sm" id="jReplayCta">replay</button>
-      </div>
-      <ol class="journey-timeline" id="journeyTimeline"></ol>
-    </div>
 
-    <!-- Highlights: always shown at end or in resume mode -->
-    <div class="journey-highlights" id="journeyHighlights" hidden>
-      <span class="journey-highlights-heading">highlights</span>
-      <ul class="journey-strengths">
-        <li>Motion-led interactive experiences</li>
-        <li>Design systems &amp; visual identity</li>
-        <li>Canvas &amp; WebGL animation</li>
-        <li>Brand-to-web execution</li>
-        <li>Shopify front-end development</li>
-        <li>Video editing &amp; compositing</li>
-        <li>Creative direction &amp; concept</li>
-        <li>Cross-platform responsive UI</li>
-      </ul>
-      <span class="journey-highlights-heading" style="margin-top:1.5rem">top tools</span>
-      <ul class="journey-tools">
-        <li>after effects</li>
-        <li>premiere pro</li>
-        <li>illustrator</li>
-        <li>photoshop</li>
-        <li>vs code</li>
-        <li>ai workflows</li>
-      </ul>
-    </div>
+      <!-- Resume header -->
+      <header class="resume-header">
+        <div class="resume-name-row">
+          <span class="resume-name-spacer" aria-hidden="true"></span>
+          <h1 class="resume-name">declan gainey</h1>
+          <button type="button" class="journey-replay-sm" id="jReplayCta">replay</button>
+        </div>
+        <p class="resume-title">design technologist &bull; visual designer &bull; creative developer</p>
+        <div class="resume-contact-row">
+          <span>santa monica, ca</span>
+          <span class="resume-sep">&middot;</span>
+          <span>310-844-5541</span>
+          <span class="resume-sep">&middot;</span>
+          <a href="mailto:declangainey@gmail.com">declangainey@gmail.com</a>
+        </div>
+        <div class="resume-contact-row">
+          <a href="https://linkedin.com/in/declan-gainey9/" target="_blank" rel="noopener">linkedin.com/in/declan-gainey9</a>
+          <span class="resume-sep">&middot;</span>
+          <a href="https://westcoastillustrations.com" target="_blank" rel="noopener">westcoastillustrations.com</a>
+        </div>
+      </header>
+
+      <!-- Two-column body -->
+      <div class="resume-body">
+
+        <!-- Left column -->
+        <div class="resume-left">
+          <div class="resume-panel">
+            <span class="resume-label">summary</span>
+            <p class="resume-summary">design technologist and visual designer blending brand, motion, and front end polish to build interactive web experiences and marketing assets. strong in figma and adobe creative suite, with hands on html/css/js for animation and ui refinement.</p>
+          </div>
+
+          <div class="resume-panel">
+            <span class="resume-label">core strengths</span>
+            <ul class="resume-chips">
+              <li>ui design</li>
+              <li>typography</li>
+              <li>brand systems</li>
+              <li>motion design</li>
+              <li>content design</li>
+              <li>interaction design</li>
+              <li>creative coding (html/css/js)</li>
+              <li>responsive layout</li>
+              <li>prototyping</li>
+              <li>asset production</li>
+              <li>visual storytelling</li>
+            </ul>
+          </div>
+
+          <div class="resume-panel">
+            <span class="resume-label">tools</span>
+            <ul class="resume-chips">
+              <li>figma</li>
+              <li>illustrator</li>
+              <li>photoshop</li>
+              <li>after effects</li>
+              <li>premiere</li>
+              <li>lightroom</li>
+              <li>vs code</li>
+              <li>github</li>
+              <li>vercel</li>
+              <li>cloudinary</li>
+            </ul>
+            <span class="resume-chips-sub">(working) blender &middot; three.js &middot; shopify liquid</span>
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div class="resume-right">
+          <div class="resume-panel">
+            <span class="resume-label">experience</span>
+            <ol class="resume-exp-list">
+              <li class="resume-exp-item">
+                <div class="resume-exp-org">nile secure</div>
+                <div class="resume-exp-meta">multimedia consultant (contract) &mdash; remote</div>
+                <div class="resume-exp-date">2025 &ndash; present</div>
+                <ul class="resume-exp-bullets">
+                  <li>develop brand-consistent visual assets for product and marketing teams across web and digital channels</li>
+                  <li>create motion-forward deliverables and presentation visuals that improve clarity and engagement</li>
+                  <li>collaborate asynchronously with stakeholders, shipping polished iterations on tight timelines</li>
+                </ul>
+              </li>
+              <li class="resume-exp-item">
+                <div class="resume-exp-org">west coast illustrations llc</div>
+                <div class="resume-exp-meta">founder, creative director &mdash; santa monica</div>
+                <div class="resume-exp-date">2023 &ndash; present</div>
+                <ul class="resume-exp-bullets">
+                  <li>design brand identities, web graphics, and motion assets for online clients</li>
+                  <li>produce marketing visuals that simplify complex ideas into clear, compelling stories</li>
+                  <li>build and maintain a modern portfolio site with interactive elements and performance-minded polish</li>
+                </ul>
+              </li>
+              <li class="resume-exp-item">
+                <div class="resume-exp-org">amerikid</div>
+                <div class="resume-exp-meta">co-founder, creative director &mdash; los angeles</div>
+                <div class="resume-exp-date">2020 &ndash; present</div>
+                <ul class="resume-exp-bullets">
+                  <li>lead creative direction for a streetwear and art collective across product graphics, content, and web</li>
+                  <li>design drop assets and social content to support launches and community growth</li>
+                  <li>experiment with interactive web moments that extend the brand beyond apparel</li>
+                </ul>
+              </li>
+            </ol>
+          </div>
+        </div>
+
+      </div><!-- /resume-body -->
+
+      <!-- Bottom row: education + selected projects -->
+      <div class="resume-bottom">
+        <div class="resume-panel">
+          <span class="resume-label">education</span>
+          <div class="resume-edu-org">university of oregon</div>
+          <div class="resume-edu-detail">b.s. art and technology, minor in business &bull; 2024</div>
+          <div class="resume-edu-detail">semester abroad: fine art and conceptual design studies, paris</div>
+        </div>
+        <div class="resume-panel">
+          <span class="resume-label">selected projects</span>
+          <ul class="resume-project-list">
+            <li>pacifico dance company: logo redesign + motion explorations</li>
+            <li>studio 3 marketing: landing page design test + component system concepts</li>
+            <li>club amerikid: membership hub ui + interactive web prototypes</li>
+          </ul>
+        </div>
+      </div>
+
+    </div><!-- /journeyResume -->
+
+    <!-- Highlights kept as sibling for JS show/hide parity -->
+    <div class="journey-highlights" id="journeyHighlights" hidden></div>
   </main>
 
   <!-- Overlay menu -->
