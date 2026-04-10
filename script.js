@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ═══════════════════════════════════════════════════════════════
     //  ACCENT COMET STATE MACHINE
     //  Deterministic stop-to-stop comet travel system
-    //  remembering → gainey → rotatingWord → skills → work
+    //  remembering → gainey → rotatingWord → work
     // ═══════════════════════════════════════════════════════════════
 
     // --- Tuning ---
@@ -337,7 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const HEAD_GLOW      = 14;    // comet head shadowBlur (px)
     const BEZIER_CURVE   = 0.25;  // control point offset (fraction of distance)
     const HYSTERESIS     = 40;    // px scroll margin to prevent jitter retrigger
-    const PREVIEW_DURATION = 400; // ms for skills hover preview comet
     const SPARKLE_CHANCE = 0.10;  // 10% chance per spawn iteration for micro sparkle
     const IDLE_ARM_MS    = 1200;  // ms of no interaction before idle attract starts
     const IDLE_DWELL_MS  = 1400;  // ms pause between idle hops
@@ -399,7 +398,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Stop definitions ──
     // Each stop: { id, posEl, varEl, cssVar, activeVal, inactiveVal }
     const rotatingEl = document.getElementById('rotatingWord');
-    const skillsEl   = document.querySelector('[data-accent-stop="skills"]');
     const workEl     = document.querySelector('[data-accent-stop="work"]');
     const approachEl = document.querySelector('[data-accent-stop="approach"]');
 
@@ -407,7 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sourceEl)    STOPS.push({ id:'remembering', posEl:sourceEl,   varEl:sourceEl,   cssVar:'--rem-drain', activeVal:'0', inactiveVal:'1' });
     if (targetGlow)  STOPS.push({ id:'gainey',      posEl:targetGlow, varEl:targetEl,   cssVar:'--gainey-p',  activeVal:'1', inactiveVal:'0' });
     if (rotatingEl)  STOPS.push({ id:'rotating',    posEl:rotatingEl, varEl:rotatingEl, cssVar:'--flow-p',    activeVal:'1', inactiveVal:'0' });
-    if (skillsEl)    STOPS.push({ id:'skills',      posEl:skillsEl,   varEl:skillsEl,   cssVar:'--flow-p',    activeVal:'1', inactiveVal:'0' });
     if (workEl)      STOPS.push({ id:'work',        posEl:workEl,     varEl:workEl,     cssVar:'--flow-p',    activeVal:'1', inactiveVal:'0' });
 
     // ── State machine ──
@@ -438,10 +435,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let hopActive    = false;
     let hopReverse   = false;
     let hopStartTime = 0;
-
-    // ── Skills hover preview ──
-    let previewMode      = false;
-    let previewReturnIdx = -1;
 
     // ── Work zone tease state ──
     let lastUserActionTs  = performance.now();
@@ -805,12 +798,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       lastUserActionTs = performance.now();
 
-      // Cancel preview on scroll
-      if (previewMode) {
-        previewMode = false;
-        if (cometActive) cancelComet();
-      }
-
       // Let queued nav finish without interference
       if (navMode) return;
 
@@ -893,7 +880,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const goToStop = (targetIdx) => {
       if (!accentInited || targetIdx < 0 || targetIdx >= STOPS.length) return;
       if (targetIdx === currentStopIdx) return;
-      if (previewMode) { previewMode = false; }
       if (cometActive) cancelComet();
       navMode = true;
       navQueue = [];
@@ -902,47 +888,6 @@ document.addEventListener('DOMContentLoaded', () => {
         navQueue.push(i);
       }
       advanceNav();
-    };
-
-    // ── Skills hover preview ──
-    const skillsIdx = STOPS.findIndex(s => s.id === 'skills');
-
-    const startSkillsPreview = () => {
-      if (!accentInited || skillsIdx < 0 || navMode) return;
-      if (prefersReducedHero) { if (skillsEl) setStopActive(skillsIdx, true); return; }
-      if (previewMode || hopActive || currentStopIdx === skillsIdx) return;
-
-      previewMode = true;
-      previewReturnIdx = currentStopIdx;
-      if (cometActive) cancelComet();
-      launchComet(currentStopIdx, skillsIdx, PREVIEW_DURATION);
-    };
-
-    const endSkillsPreview = () => {
-      if (!previewMode) return;
-      previewMode = false;
-      if (prefersReducedHero) {
-        if (skillsIdx >= 0) setStopActive(skillsIdx, false);
-        if (previewReturnIdx >= 0) setStopActive(previewReturnIdx, true);
-        return;
-      }
-      const returnTo = computeScrollTarget();
-      if (cometActive) cancelComet();
-      launchComet(skillsIdx, returnTo, PREVIEW_DURATION);
-      currentStopIdx = returnTo;
-    };
-
-    const onSkillsClick = (e) => {
-      if (skillsIdx < 0) return;
-      e.preventDefault();
-      const sec = document.getElementById('skills');
-      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      if (prefersReducedHero) {
-        for (let i = 0; i < STOPS.length; i++) setStopActive(i, i === skillsIdx);
-        currentStopIdx = skillsIdx;
-        return;
-      }
-      goToStop(skillsIdx);
     };
 
     // ── Approach hover hop handlers ──
@@ -980,7 +925,6 @@ document.addEventListener('DOMContentLoaded', () => {
         && !workTeaseDone
         && !workTeaseRunning
         && !prefersReducedHero
-        && !previewMode
         && !navMode
         && !cometActive
         && !hopActive
@@ -1037,14 +981,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const link = approachEl.closest('a') || approachEl;
         link.addEventListener('pointerenter', startApproachHop);
         link.addEventListener('pointerleave', endApproachHop);
-      }
-
-      // Skills hover preview + click listeners
-      if (skillsIdx >= 0 && skillsEl) {
-        const skillsWrap = skillsEl.closest('a') || skillsEl;
-        skillsWrap.addEventListener('pointerenter', startSkillsPreview);
-        skillsWrap.addEventListener('pointerleave', endSkillsPreview);
-        skillsWrap.addEventListener('click', onSkillsClick);
       }
 
       // Idle attract: observe work zone visibility
@@ -1107,9 +1043,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', updateHeroOnScroll);
   }
 
-  // 5. Fade in stacked panels (about, skills, services) as they stack
+  // 5. Fade in stacked panels (about, services) as they stack
   const stackedPanels = document.querySelectorAll(
-    '.panel-stack .agency-intro, .panel-stack .skills-showcase, .panel-stack .services'
+    '.panel-stack .agency-intro, .panel-stack .services'
   );
 
   if (stackedPanels.length) {
@@ -1129,16 +1065,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 6. Hide wordmark when skills section reaches the header
+  // 6. Hide wordmark when services section reaches the header
   const siteWordmark = document.querySelector('.site-wordmark');
-  const skillsSection = document.getElementById('skills');
+  const wordmarkTrigger = document.querySelector('.services');
   const header = document.querySelector('.site-header');
 
-  if (siteWordmark && skillsSection) {
+  if (siteWordmark && wordmarkTrigger) {
     const headerHeight = header ? header.offsetHeight : 64;
 
     const updateWordmark = () => {
-      const rect = skillsSection.getBoundingClientRect();
+      const rect = wordmarkTrigger.getBoundingClientRect();
       if (rect.top <= headerHeight + 8) siteWordmark.classList.add('wordmark-hide');
       else siteWordmark.classList.remove('wordmark-hide');
     };
