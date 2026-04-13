@@ -154,6 +154,9 @@
   object-fit: cover;
   display: block;
 }
+[data-project="nile-secure"] .cs-process-frame img {
+  object-fit: contain;
+}
 
 .cs-process-label {
   padding: clamp(0.7rem, 1.4vw, 1rem) clamp(1rem, 2vw, 1.5rem);
