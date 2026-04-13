@@ -90,15 +90,7 @@
 
   function buildSourceSeeds(total) {
     const out = [];
-    for (let i = 0; i < total; i++) {
-      const t = total <= 1 ? 0.5 : i / (total - 1);
-      const nx = 0.15 + t * 0.70 + rnd(-0.015, 0.015);
-      const ny = 0.58 + rnd(-0.04, 0.04);
-      out.push({
-        nx: Math.max(0.12, Math.min(0.88, nx)),
-        ny: Math.max(0.50, Math.min(0.74, ny)),
-      });
-    }
+    for (let i = 0; i < total; i++) out.push({ nx: 0.5, ny: 0.5 });
     return out;
   }
 
