@@ -3062,6 +3062,7 @@ body.services-active .services::before {
   padding: 2.5rem 1.25rem 1.25rem;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.82), transparent);
   border-radius: 0 0 14px 14px;
+  text-align: center;
 }
 
 .comic-panel-name {
@@ -3075,9 +3076,11 @@ body.services-active .services::before {
 
 .comic-panel-desc {
   margin: 0.35rem 0 0;
-  font-size: clamp(0.78rem, 0.9vw, 0.92rem);
-  color: var(--muted);
+  font-size: clamp(0.82rem, 1vw, 0.95rem);
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 450;
   line-height: 1.45;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
