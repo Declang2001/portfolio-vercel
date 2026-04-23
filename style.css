@@ -190,6 +190,35 @@ a {
   height: 260vh; /* extra 60vh linger on name + specialization */
 }
 
+/* Subtle programmatic corner texture — "builder" signal */
+.hero.hero--home::before {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: min(320px, 35vw);
+  height: min(320px, 35vh);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(168, 85, 247, 0.04) 0px,
+      rgba(168, 85, 247, 0.04) 1px,
+      transparent 1px,
+      transparent 40px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(168, 85, 247, 0.04) 0px,
+      rgba(168, 85, 247, 0.04) 1px,
+      transparent 1px,
+      transparent 40px
+    );
+  mask-image: linear-gradient(135deg, transparent 30%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0.8) 100%);
+  -webkit-mask-image: linear-gradient(135deg, transparent 30%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .hero-inner {
   position: sticky;
   top: 0;
@@ -309,7 +338,9 @@ a {
   color: color-mix(in srgb, #ffffff calc((1 - var(--gainey-p)) * 100%), var(--accent) calc(var(--gainey-p) * 100%));
   text-shadow:
     0 0 calc(6px * var(--gainey-p)) rgba(168, 85, 247, 0.6),
-    0 0 calc(14px * var(--gainey-p)) rgba(168, 85, 247, 0.4);
+    0 0 calc(14px * var(--gainey-p)) rgba(168, 85, 247, 0.4),
+    0 0 calc(30px * var(--gainey-p)) rgba(168, 85, 247, 0.2),
+    0 0 calc(60px * var(--gainey-p)) rgba(168, 85, 247, 0.08);
 }
 
 @supports not (color: color-mix(in srgb, white 50%, black 50%)) {
@@ -369,6 +400,37 @@ a {
   text-transform: uppercase;
   color: var(--muted);
   max-width: 40rem;
+}
+
+/* Hero utility row — email link, secondary to center stack */
+.hero-contact-line {
+  margin: 1.2rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+.hero-contact-line a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.hero-contact-line a:hover,
+.hero-contact-line a:focus-visible {
+  color: var(--accent, rgb(168,85,247));
+}
+
+/* Desktop: move utility row to bottom-left of hero */
+@media (min-width: 768px) {
+  .hero-contact-line {
+    position: absolute;
+    bottom: 3.2vh;
+    left: clamp(1.5rem, 8vw, 8rem);
+    margin: 0;
+    text-align: left;
+  }
 }
 
 .hero-scroll-indicator {

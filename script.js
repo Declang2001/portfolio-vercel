@@ -264,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (heroSection) {
     const heroLines = heroSection.querySelectorAll('.hero-line');
     const heroPortfolio = heroSection.querySelector('.hero-portfolio');
+    const heroContactLine = heroSection.querySelector('.hero-contact-line');
     let ticking = false;
     let lastProgress = -1;
     const isMobile = window.innerWidth <= 767;
@@ -313,6 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let t = (progress - appearStart) / (appearEnd - appearStart);
         t = Math.min(Math.max(t, 0), 1);
         heroPortfolio.style.opacity = String(t);
+        if (heroContactLine) heroContactLine.style.opacity = String(t);
       }
 
       ticking = false;
