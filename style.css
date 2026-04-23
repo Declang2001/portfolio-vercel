@@ -407,7 +407,7 @@ a {
   margin: 1.2rem 0 0;
   font-size: 0.78rem;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   z-index: 4;
   opacity: 0;
   transition: opacity 0.2s ease-out;
