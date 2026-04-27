@@ -1590,8 +1590,17 @@ body.services-active .services::before {
   }
 
   .hero-portfolio-sub {
-    font-size: 0.8rem;
-    padding-inline: 1.5rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    padding-inline: 1.2rem;
+    line-height: 1.6;
+  }
+
+  .hero-contact-line {
+    margin: 1.6rem 0 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-align: center;
   }
 
   .agency-headline {
