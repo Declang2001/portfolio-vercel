@@ -3339,6 +3339,11 @@ document.addEventListener('DOMContentLoaded', () => {
     var totalH = fx.totalH * s;
     var blockTop = cy - totalH * 0.42 + yDrift;
 
+    // Clamp: prevent milestone block from overlapping the scrubber/controls
+    var safeBottom = 130 * dpr;
+    var blockEnd = blockTop + totalH;
+    if (blockEnd > H - safeBottom) blockTop = H - safeBottom - totalH;
+
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
 
