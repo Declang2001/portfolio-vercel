@@ -1978,6 +1978,75 @@ body.services-active .services::before {
   text-align: center;
 }
 
+/* Method pillars */
+.approach-page .approach-pillars {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  max-width: 820px;
+  margin: 1.6rem auto 0;
+  padding: 0;
+}
+.approach-page .approach-pillars::before {
+  content: "";
+  position: absolute;
+  inset: -18px -24px;
+  border-radius: 28px;
+  background: radial-gradient(ellipse at 50% 40%, rgba(168, 85, 247, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+@media (min-width: 768px) {
+  .approach-page .approach-pillars {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+}
+.approach-page .approach-pillar {
+  padding: 1.4rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 20px rgba(168, 85, 247, 0.04);
+  text-align: left;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.35s ease,
+              box-shadow 0.35s ease;
+}
+@media (hover: hover) {
+  .approach-page .approach-pillar:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4), 0 0 24px rgba(168, 85, 247, 0.1);
+  }
+}
+.approach-page .approach-pillar-label {
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: lowercase;
+  color: rgba(168, 85, 247, 0.9);
+  font-weight: 600;
+  margin: 0 0 0.55rem;
+  text-shadow: 0 0 6px rgba(168, 85, 247, 0.5), 0 0 14px rgba(168, 85, 247, 0.25);
+}
+.approach-page .approach-pillar-desc {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .approach-page .approach-pillar {
+    transition: none;
+  }
+  .approach-page .approach-pillar:hover {
+    transform: none;
+  }
+}
+
 /* Stacked collage cards - mobile / tablet default (non sticky) */
 .collage-stack {
   position: relative;
