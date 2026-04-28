@@ -288,6 +288,12 @@
   border-bottom: none;
 }
 
+/* Live-site link below subtitle */
+.cs-live {
+  display: inline-flex;
+  margin-top: 1rem;
+}
+
 /* ============================================================
    TRIAD (brief / build / result)
    ============================================================ */
