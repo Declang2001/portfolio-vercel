@@ -23,21 +23,38 @@
 
 /* ── Hero ── */
 .halve-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding-top: calc(var(--header-height, 64px) + 3rem);
   padding-bottom: 2.5rem;
   text-align: center;
 }
+.halve-hero > .halve-back {
+  align-self: flex-start;
+}
 
 .halve-back {
   display: inline-block;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   letter-spacing: 0.12em;
   text-transform: lowercase;
   color: #888;
   text-decoration: none;
-  transition: color 0.2s ease;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.04);
+  opacity: 0.7;
+  transition: opacity 0.3s ease, border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
 }
-.halve-back:hover { color: #fff; }
+.halve-back:hover {
+  opacity: 1;
+  color: #C2410C;
+  border-color: rgba(194, 65, 12, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(194, 65, 12, 0.08);
+}
 
 .halve-kicker {
   display: block;
@@ -417,6 +434,64 @@
 
 .halve-back--bottom {
   font-size: 0.9rem;
+}
+
+/* ── Hero entrance animation ── */
+@keyframes halveReveal {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.halve-hero > .halve-back    { opacity: 0; animation: halveReveal 0.7s 0.2s ease-out forwards; }
+.halve-hero > .halve-kicker  { opacity: 0; animation: halveReveal 0.7s 0.35s ease-out forwards; }
+.halve-hero > .halve-title   { opacity: 0; animation: halveReveal 0.8s 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.halve-hero > .halve-subtitle{ opacity: 0; animation: halveReveal 0.8s 0.7s ease-out forwards; }
+.halve-hero > .halve-meta    { opacity: 0; animation: halveReveal 0.8s 0.9s ease-out forwards; }
+
+/* ── Section scroll reveal ── */
+.halve-overview,
+.halve-system,
+.halve-walkthrough,
+.halve-flow,
+.halve-notes {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+
+.halve-overview.is-in,
+.halve-system.is-in,
+.halve-walkthrough.is-in,
+.halve-flow.is-in,
+.halve-notes.is-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .halve-hero > .halve-back,
+  .halve-hero > .halve-kicker,
+  .halve-hero > .halve-title,
+  .halve-hero > .halve-subtitle,
+  .halve-hero > .halve-meta {
+    opacity: 1;
+    animation: none;
+  }
+
+  .halve-overview,
+  .halve-system,
+  .halve-walkthrough,
+  .halve-flow,
+  .halve-notes {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .halve-back {
+    transition: none;
+  }
 }
 
 /* =============================================
