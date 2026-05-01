@@ -18,6 +18,38 @@
   --cs-block-gap: clamp(1rem, 2.5vh, 1.8rem);
 }
 
+/* ── Per-project accent overrides ── */
+.cs[data-project="amerikid"] {
+  --cs-accent: #a855f7;
+  --cs-accent-soft: rgba(168, 85, 247, 0.15);
+  --cs-accent-glow: rgba(168, 85, 247, 0.45);
+}
+.cs[data-project="pacifico"] {
+  --cs-accent: #dc2626;
+  --cs-accent-soft: rgba(220, 38, 38, 0.15);
+  --cs-accent-glow: rgba(220, 38, 38, 0.45);
+}
+.cs[data-project="task-orbit"] {
+  --cs-accent: #3b82f6;
+  --cs-accent-soft: rgba(59, 130, 246, 0.15);
+  --cs-accent-glow: rgba(59, 130, 246, 0.45);
+}
+.cs[data-project="broken-hearts"] {
+  --cs-accent: #d4d4d4;
+  --cs-accent-soft: rgba(212, 212, 212, 0.15);
+  --cs-accent-glow: rgba(212, 212, 212, 0.45);
+}
+.cs[data-project="nile-secure"] {
+  --cs-accent: #d946ef;
+  --cs-accent-soft: rgba(217, 70, 239, 0.15);
+  --cs-accent-glow: rgba(217, 70, 239, 0.45);
+}
+.cs[data-project="studio-3"] {
+  --cs-accent: #f9a8d4;
+  --cs-accent-soft: rgba(249, 168, 212, 0.15);
+  --cs-accent-glow: rgba(249, 168, 212, 0.45);
+}
+
 /* ── Root wrapper ── */
 .cs {
   position: relative;

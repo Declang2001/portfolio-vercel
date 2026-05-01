@@ -51,7 +51,7 @@
   // ── Accent color ──
   let aR = 168, aG = 85, aB = 247;
   const parseAccent = () => {
-    const raw = getComputedStyle(document.documentElement)
+    const raw = getComputedStyle(document.querySelector('.cs') || document.documentElement)
       .getPropertyValue('--cs-accent').trim() || '#a855f7';
     const d = document.createElement('div');
     d.style.color = raw;
