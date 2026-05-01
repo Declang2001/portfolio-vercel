@@ -436,6 +436,116 @@
   font-size: 0.9rem;
 }
 
+/* ── Expand button (scrollable frames) ── */
+.halve-mockup--scroll {
+  position: relative;
+}
+
+.halve-expand {
+  position: sticky;
+  top: 0;
+  float: right;
+  z-index: 2;
+  margin: 0.85rem 0.85rem 0 0;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: lowercase;
+  color: #ddd;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 100px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.halve-mockup--scroll:hover .halve-expand,
+.halve-expand:focus-visible {
+  opacity: 1;
+}
+
+.halve-expand:hover {
+  color: #C2410C;
+  border-color: rgba(194, 65, 12, 0.4);
+  box-shadow: 0 2px 12px rgba(194, 65, 12, 0.12);
+}
+
+.halve-expand:focus-visible {
+  outline: 2px solid #C2410C;
+  outline-offset: 2px;
+}
+
+/* ── Clickable static frames ── */
+.halve-mockup--clickable {
+  cursor: pointer;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.halve-mockup--clickable:hover {
+  border-color: rgba(194, 65, 12, 0.35);
+  box-shadow: 0 4px 20px rgba(194, 65, 12, 0.08);
+}
+
+/* ── Lightbox ── */
+.halve-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.halve-lightbox.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.halve-lightbox-panel {
+  position: relative;
+  max-width: 90vw;
+  max-height: 88vh;
+}
+
+.halve-lightbox-img {
+  display: block;
+  max-width: 90vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.halve-lightbox-close {
+  position: absolute;
+  top: -2.2rem;
+  right: -0.5rem;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  padding: 0.5rem;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.halve-lightbox-close:hover {
+  opacity: 1;
+}
+
+.halve-lightbox-close:focus-visible {
+  outline: 2px solid #C2410C;
+  outline-offset: 2px;
+}
+
 /* ── Hero entrance animation ── */
 @keyframes halveReveal {
   from { opacity: 0; transform: translateY(18px); }
@@ -492,6 +602,19 @@
   .halve-back {
     transition: none;
   }
+
+  .halve-lightbox {
+    transition: none;
+  }
+
+  .halve-expand {
+    opacity: 0.7;
+    transition: none;
+  }
+
+  .halve-mockup--clickable {
+    transition: none;
+  }
 }
 
 /* =============================================
@@ -532,6 +655,14 @@
   .halve-mockup--scroll {
     max-height: none;
     overflow: visible;
+  }
+
+  .halve-expand {
+    position: absolute;
+    top: 0.85rem;
+    right: 0.85rem;
+    float: none;
+    opacity: 0.6;
   }
 
   .halve-mockup-pair--social {

@@ -115,9 +115,11 @@
         <div class="halve-touchpoint-media">
           <div class="halve-mockup-pair">
             <div class="halve-mockup halve-mockup--desktop halve-mockup--scroll">
+              <button class="halve-expand" type="button" aria-label="Expand launch email desktop">expand</button>
               <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673476/halve_email1_desktop.png" alt="Halve launch email desktop" loading="lazy">
             </div>
             <div class="halve-mockup halve-mockup--mobile halve-mockup--scroll">
+              <button class="halve-expand" type="button" aria-label="Expand launch email mobile">expand</button>
               <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673474/halve_email1_mobile.png" alt="Halve launch email mobile" loading="lazy">
             </div>
           </div>
@@ -134,7 +136,7 @@
           </div>
         </div>
         <div class="halve-touchpoint-media">
-          <div class="halve-mockup halve-mockup--centered">
+          <div class="halve-mockup halve-mockup--centered halve-mockup--clickable">
             <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673474/halve_inbox.png" alt="Halve launch email shown inside an inbox context mockup" loading="lazy">
           </div>
         </div>
@@ -152,9 +154,11 @@
         <div class="halve-touchpoint-media">
           <div class="halve-mockup-pair">
             <div class="halve-mockup halve-mockup--desktop halve-mockup--scroll">
+              <button class="halve-expand" type="button" aria-label="Expand landing page desktop">expand</button>
               <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673480/halve_lp_desktop.png" alt="Halve landing page desktop" loading="lazy">
             </div>
             <div class="halve-mockup halve-mockup--mobile halve-mockup--scroll">
+              <button class="halve-expand" type="button" aria-label="Expand landing page mobile">expand</button>
               <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673475/halve_lp_mobile.png" alt="Halve landing page mobile" loading="lazy">
             </div>
           </div>
@@ -172,6 +176,7 @@
         </div>
         <div class="halve-touchpoint-media">
           <div class="halve-mockup halve-mockup--desktop halve-mockup--centered halve-mockup--scroll">
+            <button class="halve-expand" type="button" aria-label="Expand follow-up email">expand</button>
             <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673474/halve_email2_desktop.png" alt="Halve follow-up email" loading="lazy">
           </div>
         </div>
@@ -188,10 +193,10 @@
         </div>
         <div class="halve-touchpoint-media">
           <div class="halve-mockup-pair halve-mockup-pair--social">
-            <div class="halve-mockup halve-mockup--story">
+            <div class="halve-mockup halve-mockup--story halve-mockup--clickable">
               <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673474/halve_social_story.png" alt="Halve Instagram story" loading="lazy">
             </div>
-            <div class="halve-mockup halve-mockup--feed">
+            <div class="halve-mockup halve-mockup--feed halve-mockup--clickable">
               <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673474/halve_social_feed.png" alt="Halve Instagram feed" loading="lazy">
             </div>
           </div>
@@ -202,7 +207,7 @@
     <!-- 5. CAMPAIGN FLOW -->
     <section class="halve-flow">
       <div class="halve-section-label">campaign flow</div>
-      <div class="halve-flow-media">
+      <div class="halve-flow-media halve-mockup--clickable">
         <img src="https://res.cloudinary.com/ddpcw88mj/image/upload/v1777673475/halve_campaign_flow.png" alt="Halve campaign flow diagram" loading="lazy">
       </div>
     </section>
@@ -275,6 +280,68 @@
       });
     }, { threshold: 0.15 });
     secs.forEach(function (s) { io.observe(s); });
+  })();
+  </script>
+  <script>
+  (function () {
+    if (!document.body.classList.contains('halve-cs')) return;
+
+    /* Create lightbox DOM */
+    var lb = document.createElement('div');
+    lb.className = 'halve-lightbox';
+    lb.setAttribute('role', 'dialog');
+    lb.setAttribute('aria-label', 'image viewer');
+    lb.innerHTML =
+      '<div class="halve-lightbox-panel">' +
+        '<button class="halve-lightbox-close" aria-label="close viewer">&times;</button>' +
+        '<img class="halve-lightbox-img" src="" alt="">' +
+      '</div>';
+    document.body.appendChild(lb);
+
+    var img = lb.querySelector('.halve-lightbox-img');
+    var closeBtn = lb.querySelector('.halve-lightbox-close');
+    var prevFocus = null;
+
+    function open(src, alt) {
+      img.src = src;
+      img.alt = alt || '';
+      prevFocus = document.activeElement;
+      lb.classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+      closeBtn.focus();
+    }
+
+    function close() {
+      lb.classList.remove('is-open');
+      document.body.style.overflow = '';
+      if (prevFocus) prevFocus.focus();
+    }
+
+    /* Expand buttons (scrollable frames) */
+    document.querySelectorAll('.halve-expand').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var target = btn.parentElement.querySelector('img');
+        if (target) open(target.src, target.alt);
+      });
+    });
+
+    /* Clickable static frames */
+    document.querySelectorAll('.halve-mockup--clickable').forEach(function (frame) {
+      frame.addEventListener('click', function () {
+        var target = frame.querySelector('img');
+        if (target) open(target.src, target.alt);
+      });
+    });
+
+    /* Close handlers */
+    closeBtn.addEventListener('click', close);
+    lb.addEventListener('click', function (e) {
+      if (e.target === lb) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && lb.classList.contains('is-open')) close();
+    });
   })();
   </script>
 </body>
