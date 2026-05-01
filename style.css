@@ -3164,6 +3164,11 @@ body.services-active .services::before {
     grid-column: span 6;
     aspect-ratio: 1 / 1;
   }
+
+  .comic-panel--wide {
+    grid-column: span 12;
+    aspect-ratio: 21 / 9;
+  }
 }
 
 /* Video fills panel (gradient bg for empty panels) */

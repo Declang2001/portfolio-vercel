@@ -1,0 +1,511 @@
+/* =============================================
+   HALVE CAMPAIGN CASE STUDY — Scoped to .halve-cs
+   ============================================= */
+
+/* Google Fonts for design system samples only */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Space+Grotesk:wght@600;700&display=swap');
+
+/* ── Layout ── */
+.halve-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 clamp(1.25rem, 4vw, 3rem);
+}
+
+/* ── Section label (shared pattern) ── */
+.halve-section-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 1.6rem;
+}
+
+/* ── Hero ── */
+.halve-hero {
+  padding-top: calc(var(--header-height, 64px) + 3rem);
+  padding-bottom: 2.5rem;
+  text-align: center;
+}
+
+.halve-back {
+  display: inline-block;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  color: #888;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.halve-back:hover { color: #fff; }
+
+.halve-kicker {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #666;
+  margin-top: 1.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.halve-title {
+  font-size: clamp(2.6rem, 5vw, 4rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-transform: lowercase;
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.halve-subtitle {
+  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+  line-height: 1.6;
+  color: #999;
+  max-width: 640px;
+  margin: 0 auto 2rem;
+}
+
+/* ── Meta grid ── */
+.halve-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.halve-meta-item {
+  padding: 1rem 1.2rem;
+  border: 1px solid #222;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  text-align: left;
+}
+
+.halve-meta-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 0.35rem;
+}
+
+.halve-meta-value {
+  display: block;
+  font-size: 0.9rem;
+  color: #ccc;
+  line-height: 1.45;
+}
+
+/* ── Overview ── */
+.halve-overview {
+  padding: 3rem 0;
+  border-top: 1px solid #1a1a1a;
+}
+
+.halve-overview-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 3rem;
+  align-items: start;
+}
+
+.halve-overview-text h2 {
+  font-size: clamp(1.4rem, 2.2vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.halve-overview-text p {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: #999;
+}
+
+.halve-overview-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.halve-stat {
+  padding: 1rem 1.2rem;
+  border: 1px solid #222;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.halve-stat-number {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #C2410C;
+  line-height: 1;
+  margin-bottom: 0.3rem;
+}
+
+.halve-stat-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+/* ── Design system strip ── */
+.halve-system {
+  padding: 3rem 0;
+  border-top: 1px solid #1a1a1a;
+}
+
+.halve-system-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.halve-swatches {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.halve-swatch {
+  flex: 1 1 120px;
+  min-width: 100px;
+  padding: 1.2rem 1rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 80px;
+}
+
+.halve-swatch span:first-child {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.halve-swatch span:last-child {
+  font-size: 0.72rem;
+  opacity: 0.7;
+  margin-top: 0.5rem;
+}
+
+.halve-type-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.halve-type-sample {
+  padding: 1.2rem;
+  border: 1px solid #222;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.halve-type-label {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 0.8rem;
+}
+
+.halve-type-preview {
+  display: block;
+  color: #ddd;
+}
+
+/* ── Campaign walkthrough ── */
+.halve-walkthrough {
+  padding: 3rem 0;
+  border-top: 1px solid #1a1a1a;
+}
+
+.halve-touchpoint {
+  margin-bottom: 4rem;
+}
+.halve-touchpoint:last-child {
+  margin-bottom: 0;
+}
+
+.halve-touchpoint-header {
+  display: flex;
+  gap: 1.2rem;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+}
+
+.halve-touchpoint-number {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #C2410C;
+  line-height: 1;
+  flex-shrink: 0;
+  min-width: 2.2rem;
+}
+
+.halve-touchpoint-title {
+  font-size: clamp(1.1rem, 1.6vw, 1.3rem);
+  font-weight: 700;
+  color: #fff;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.4rem;
+}
+
+.halve-touchpoint-desc {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #888;
+}
+
+/* ── Mockup frames ── */
+.halve-touchpoint-media {
+  width: 100%;
+}
+
+.halve-mockup-pair {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.halve-mockup {
+  border: 1px solid #333;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #111;
+}
+
+.halve-mockup img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.halve-mockup--desktop {
+  flex: 0 1 65%;
+  max-width: 700px;
+}
+
+.halve-mockup--mobile {
+  flex: 0 1 25%;
+  max-width: 260px;
+}
+
+.halve-mockup--centered {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Scrollable artifact frame — tall emails and landing pages */
+.halve-mockup--scroll {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.halve-mockup--scroll img {
+  width: 100%;
+  height: auto;
+  display: block;
+  max-height: none;
+  object-fit: unset;
+}
+
+/* Subtle full-view link */
+.halve-fullview {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: lowercase;
+  color: #C2410C;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(194, 65, 12, 0.3);
+  transition: border-color 0.2s ease;
+}
+.halve-fullview:hover {
+  border-color: #C2410C;
+}
+
+/* Social ad pair */
+.halve-mockup-pair--social {
+  gap: 2rem;
+  justify-content: center;
+}
+
+.halve-mockup--story {
+  flex: 0 0 auto;
+  width: 240px;
+}
+
+.halve-mockup--feed {
+  flex: 0 0 auto;
+  width: 320px;
+}
+
+/* ── Campaign flow ── */
+.halve-flow {
+  padding: 3rem 0;
+  border-top: 1px solid #1a1a1a;
+}
+
+.halve-flow-media {
+  border: 1px solid #333;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #111;
+}
+
+.halve-flow-media img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ── Production notes ── */
+.halve-notes {
+  padding: 3rem 0;
+  border-top: 1px solid #1a1a1a;
+}
+
+.halve-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.halve-note {
+  padding: 1.4rem 1.3rem;
+  border: 1px solid #222;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.halve-note h4 {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+  text-transform: lowercase;
+  margin-bottom: 0.5rem;
+}
+
+.halve-note p {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: #888;
+}
+
+/* ── Footer / back ── */
+.halve-footer {
+  padding: 3rem 0 4rem;
+  border-top: 1px solid #1a1a1a;
+  text-align: center;
+}
+
+.halve-back--bottom {
+  font-size: 0.9rem;
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+
+@media (max-width: 768px) {
+  .halve-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .halve-overview-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .halve-type-row {
+    grid-template-columns: 1fr;
+  }
+
+  .halve-mockup-pair {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .halve-mockup--desktop {
+    flex: none;
+    width: 100%;
+    max-width: none;
+  }
+
+  .halve-mockup--mobile {
+    flex: none;
+    width: 60%;
+    max-width: 260px;
+  }
+
+  .halve-mockup--scroll {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .halve-mockup-pair--social {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .halve-mockup--story {
+    width: 40%;
+    min-width: 160px;
+  }
+
+  .halve-mockup--feed {
+    width: 50%;
+    min-width: 200px;
+  }
+
+  .halve-notes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .halve-touchpoint-header {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .halve-hero {
+    padding-top: calc(var(--header-height, 64px) + 2rem);
+  }
+
+  .halve-swatches {
+    gap: 0.5rem;
+  }
+
+  .halve-swatch {
+    flex: 1 1 80px;
+    min-width: 70px;
+    padding: 0.8rem 0.6rem 0.6rem;
+    min-height: 60px;
+  }
+
+  .halve-swatch span:first-child {
+    font-size: 0.7rem;
+  }
+
+  .halve-swatch span:last-child {
+    font-size: 0.62rem;
+  }
+}
