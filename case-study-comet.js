@@ -25,7 +25,8 @@
       stopSels: [
         { sel: '.halve-meta-item', centerLock: false, kind: 'meta' },
         { sel: '.halve-section-label', centerLock: false, kind: 'section' },
-        { sel: '.halve-touchpoint-title', centerLock: false, kind: 'touchpoint' }
+        { sel: '.halve-touchpoint-title', centerLock: false, kind: 'touchpoint' },
+        { sel: '.halve-overview-text .halve-flow-target, .halve-type-sample .halve-flow-target', centerLock: false, kind: 'heading' }
       ],
       accentEl: () => document.documentElement,
       accentVar: '--page-accent',
@@ -49,6 +50,13 @@
       stopEntries.push({ el, centerLock: s.centerLock, kind: s.kind || 'stop' });
     });
   }
+  // Sort by DOM position so comet follows visual reading order
+  stopEntries.sort((a, b) => {
+    const pos = a.el.compareDocumentPosition(b.el);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -183,6 +191,7 @@
   let leaveTimer     = 0;
   let scrollTargetIdx = 0;
   let scrollDebounceTimer = 0;
+  let settled        = false;
   const visibleStops = new Set();
 
   // ── CSS var helpers ──
@@ -448,6 +457,7 @@
   };
 
   const scheduleScrollUpdate = () => {
+    if (!settled) return;
     clearTimeout(scrollDebounceTimer);
     scrollDebounceTimer = setTimeout(applyScrollTarget, SCROLL_DEBOUNCE);
   };
@@ -502,13 +512,14 @@
   // ── Init ──
   parseAccent();
 
-  // All stops start at 0 (white)
-  for (let i = 0; i < STOPS.length; i++) setActive(i, false);
+  // Title starts active immediately — no visible flight into title
+  for (let i = 1; i < STOPS.length; i++) setActive(i, false);
+  activeIdx = 0;
+  setActive(0, true);
 
-  // Intro: activate title in place after entrance animations settle
+  // After hero entrance animations settle, unlock scroll-guided updates
   setTimeout(() => {
-    activeIdx = 0;
-    setActive(0, true);
-    canvas.style.opacity = '1';
+    settled = true;
+    applyScrollTarget();
   }, INTRO_DELAY);
 })();

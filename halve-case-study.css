@@ -16,7 +16,7 @@
 .halve-section-label {
   font-size: 0.78rem;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: #666;
   margin-bottom: 1.6rem;
 }
@@ -60,7 +60,7 @@
   display: block;
   font-size: 0.78rem;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: #666;
   margin-top: 1.5rem;
   margin-bottom: 0.6rem;
@@ -110,7 +110,7 @@
   display: block;
   font-size: 0.72rem;
   letter-spacing: 0.14em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: #666;
   margin-bottom: 0.35rem;
 }
@@ -174,7 +174,7 @@
 .halve-stat-label {
   font-size: 0.8rem;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: #888;
 }
 
@@ -236,7 +236,7 @@
   display: block;
   font-size: 0.7rem;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: #666;
   margin-bottom: 0.8rem;
 }
@@ -551,6 +551,34 @@
   outline-offset: 2px;
 }
 
+/* ── Comet activation (--cs-flow-p driven) ── */
+/* Gray-base: muted labels that blend from #666 → rust */
+.halve-cs .halve-section-label,
+.halve-cs .halve-type-label.halve-flow-target {
+  --cs-flow-p: 0;
+  color: color-mix(in srgb, #666 calc((1 - var(--cs-flow-p)) * 100%), var(--page-accent, #C2410C));
+  text-shadow:
+    0 0 calc(10px * var(--cs-flow-p)) rgba(194, 65, 12, 0.45),
+    0 0 calc(28px * var(--cs-flow-p)) rgba(194, 65, 12, 0.15);
+  transition: color 0.4s ease, text-shadow 0.4s ease;
+}
+
+/* White-base: headings/titles that blend from #fff → rust */
+.halve-cs .halve-touchpoint-title,
+.halve-cs .halve-flow-target:not(.halve-type-label) {
+  --cs-flow-p: 0;
+  color: color-mix(in srgb, #ffffff calc((1 - var(--cs-flow-p)) * 100%), var(--page-accent, #C2410C));
+  text-shadow:
+    0 0 calc(10px * var(--cs-flow-p)) rgba(194, 65, 12, 0.45),
+    0 0 calc(28px * var(--cs-flow-p)) rgba(194, 65, 12, 0.15);
+  transition: color 0.4s ease, text-shadow 0.4s ease;
+}
+
+/* Production note card titles glow on hover (not comet stops) */
+.halve-cs .halve-note:hover h4.halve-flow-target {
+  --cs-flow-p: 1;
+}
+
 /* ── Hero entrance animation ── */
 @keyframes halveReveal {
   from { opacity: 0; transform: translateY(18px); }
@@ -570,8 +598,8 @@
 .halve-flow,
 .halve-notes {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+  transform: translateY(18px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
 }
 
 .halve-overview.is-in,

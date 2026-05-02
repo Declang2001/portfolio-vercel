@@ -50,7 +50,7 @@
       <div class="halve-section-label">overview</div>
       <div class="halve-overview-grid">
         <div class="halve-overview-text">
-          <h2>your whole day. one bag.</h2>
+          <h2 class="halve-flow-target">your whole day. one bag.</h2>
           <p>Halve is a fictional DTC brand built as a portfolio case study. The product is a modular sling-to-backpack system for urban professionals. I designed the complete launch campaign: brand identity, design system, two marketing emails, a conversion landing page, and Instagram ads. Every touchpoint shares one visual language, built from a single token system.</p>
         </div>
         <div class="halve-overview-stats">
@@ -85,8 +85,8 @@
         <!-- Type samples row -->
         <div class="halve-type-row">
           <div class="halve-type-sample">
-            <span class="halve-type-label">Display / Space Grotesk 700</span>
-            <span class="halve-type-preview" style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px;">Your whole day.</span>
+            <span class="halve-type-label halve-flow-target">Display / Space Grotesk 700</span>
+            <span class="halve-type-preview halve-flow-target" style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px;">Your whole day.</span>
           </div>
           <div class="halve-type-sample">
             <span class="halve-type-label">Body / DM Sans 400</span>
@@ -218,27 +218,27 @@
       <div class="halve-section-label">production notes</div>
       <div class="halve-notes-grid">
         <div class="halve-note">
-          <h4>design system first</h4>
+          <h4 class="halve-flow-target">design system first</h4>
           <p>every color, type level, button, and spacing value was defined as a token before any layout work began. the campaign is the system, not a collection of one-offs.</p>
         </div>
         <div class="halve-note">
-          <h4>responsive by default</h4>
+          <h4 class="halve-flow-target">responsive by default</h4>
           <p>email layouts were built at 600px max width with mobile-first stacking. the landing page uses a 12-column grid that collapses cleanly.</p>
         </div>
         <div class="halve-note">
-          <h4>email constraints</h4>
+          <h4 class="halve-flow-target">email constraints</h4>
           <p>real email rendering limits were respected: no custom fonts in body, table-safe layouts, system font stacks as fallback, image-based hero with alt text.</p>
         </div>
         <div class="halve-note">
-          <h4>campaign coherence</h4>
+          <h4 class="halve-flow-target">campaign coherence</h4>
           <p>a recipient who sees the email, clicks to the landing page, gets a follow-up, and sees a story ad encounters one brand, not four separate designs.</p>
         </div>
         <div class="halve-note">
-          <h4>typography</h4>
+          <h4 class="halve-flow-target">typography</h4>
           <p>Space Grotesk for display and CTAs, DM Sans for body copy. two fonts, seven levels, consistent hierarchy across every touchpoint.</p>
         </div>
         <div class="halve-note">
-          <h4>tools</h4>
+          <h4 class="halve-flow-target">tools</h4>
           <p>designed in HTML/CSS with AI-assisted iteration. production assets sized for email clients, web, and social platforms.</p>
         </div>
       </div>
@@ -280,7 +280,7 @@
       entries.forEach(function (e) {
         if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
       });
-    }, { threshold: 0.15 });
+    }, { threshold: 0.05 });
     secs.forEach(function (s) { io.observe(s); });
   })();
   </script>
