@@ -219,6 +219,31 @@
   margin-top: 0.5rem;
 }
 
+/* ── Light swatch contrast ── */
+.halve-swatch.is-light { color: #1C1917; }
+.halve-swatch.is-light span:last-child { opacity: 0.5; }
+
+/* ── Swatch hover lift ── */
+.halve-swatch {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.halve-swatch:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Swatch stagger reveal ── */
+.halve-system .halve-swatch {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out, box-shadow 0.25s ease;
+}
+.halve-system.is-in .halve-swatch:nth-child(1) { opacity: 1; transform: translateY(0); transition-delay: 0ms; }
+.halve-system.is-in .halve-swatch:nth-child(2) { opacity: 1; transform: translateY(0); transition-delay: 60ms; }
+.halve-system.is-in .halve-swatch:nth-child(3) { opacity: 1; transform: translateY(0); transition-delay: 120ms; }
+.halve-system.is-in .halve-swatch:nth-child(4) { opacity: 1; transform: translateY(0); transition-delay: 180ms; }
+.halve-system.is-in .halve-swatch:nth-child(5) { opacity: 1; transform: translateY(0); transition-delay: 240ms; }
+
 .halve-type-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -646,6 +671,19 @@
   }
 
   .halve-mockup--clickable {
+    transition: none;
+  }
+
+  .halve-swatch {
+    transition: none;
+  }
+  .halve-swatch:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .halve-system .halve-swatch {
+    opacity: 1;
+    transform: none;
     transition: none;
   }
 }
