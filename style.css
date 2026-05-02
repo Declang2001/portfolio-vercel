@@ -105,7 +105,7 @@ a {
 }
 
 .wordmark-last {
-  color: var(--accent);
+  color: var(--page-accent, var(--accent));
 }
 
 /* burger */
@@ -1479,7 +1479,7 @@ body.services-active .services::before {
 }
 
 .overlay-nav a:hover {
-  color: var(--accent);
+  color: var(--page-accent, var(--accent));
 }
 
 /* LAPTOP */

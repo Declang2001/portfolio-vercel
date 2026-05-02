@@ -468,9 +468,9 @@
   inset: -14px;
   border-radius: inherit;
   background: radial-gradient(circle at 50% 50%,
-    rgba(168,85,247,0.55),
-    rgba(168,85,247,0.18) 45%,
-    rgba(168,85,247,0) 75%);
+    var(--cs-accent-glow),
+    var(--cs-accent-soft) 45%,
+    transparent 75%);
   filter: blur(18px);
   opacity: calc(0.9 * var(--cs-flow-p));
   transform: scale(calc(0.98 + 0.04 * var(--cs-flow-p)));
@@ -547,7 +547,7 @@
   margin: 0 0 1.5rem;
   text-align: center;
   color: var(--cs-accent);
-  text-shadow: 0 0 8px var(--cs-accent-glow), 0 0 20px rgba(168,85,247,0.2);
+  text-shadow: 0 0 8px var(--cs-accent-glow), 0 0 20px var(--cs-accent-soft);
 }
 
 .cs-body {
@@ -619,7 +619,7 @@
 
 .cs-tab.is-active {
   color: var(--cs-accent);
-  text-shadow: 0 0 8px var(--cs-accent-glow), 0 0 20px rgba(168,85,247,0.25);
+  text-shadow: 0 0 8px var(--cs-accent-glow), 0 0 20px var(--cs-accent-soft);
 }
 
 .cs-tab:focus-visible {
@@ -635,9 +635,9 @@
   left: 0;
   height: calc(100% - 8px);
   border-radius: 100px;
-  background: rgba(168, 85, 247, 0.12);
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  box-shadow: 0 0 16px rgba(168, 85, 247, 0.08);
+  background: var(--cs-accent-soft);
+  border: 1px solid var(--cs-accent-glow);
+  box-shadow: 0 0 16px var(--cs-accent-soft);
   pointer-events: none;
   transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
               width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
