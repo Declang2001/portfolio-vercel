@@ -5,21 +5,56 @@
 (function () {
   'use strict';
 
-  const titleEl = document.querySelector('.cs-hero .cs-title');
-  if (!titleEl) return;
+  // ── Page configs ──
+  const PAGE_CONFIGS = [
+    {
+      titleSel: '.cs-hero .cs-title',
+      stopSels: [
+        { sel: '.cs-hero .cs-meta-item', centerLock: false },
+        { sel: '.cs-triad-col', centerLock: false },
+        { sel: '.cs-gallery .cs-media', centerLock: true },
+        { sel: '.cs-tabs .cs-tab', centerLock: false }
+      ],
+      accentEl: () => document.querySelector('.cs') || document.documentElement,
+      accentVar: '--cs-accent',
+      accentFallback: '#a855f7'
+    },
+    {
+      titleSel: '.halve-title',
+      stopSels: [
+        { sel: '.halve-meta-item', centerLock: false },
+        { sel: '.halve-section-label', centerLock: false },
+        { sel: '.halve-touchpoint-title', centerLock: false }
+      ],
+      accentEl: () => document.documentElement,
+      accentVar: '--page-accent',
+      accentFallback: '#C2410C'
+    }
+  ];
 
-  // ── Collect all target elements ──
-  const metaItems = Array.from(document.querySelectorAll('.cs-hero .cs-meta-item'));
-  const triadCols = Array.from(document.querySelectorAll('.cs-triad-col'));
-  const mediaEls  = Array.from(document.querySelectorAll('.cs-gallery .cs-media'));
-  const tabEls    = Array.from(document.querySelectorAll('.cs-tabs .cs-tab'));
+  // ── Resolve page config ──
+  let cfg = null;
+  let titleEl = null;
+  for (const c of PAGE_CONFIGS) {
+    const el = document.querySelector(c.titleSel);
+    if (el) { cfg = c; titleEl = el; break; }
+  }
+  if (!cfg) return;
+
+  // ── Collect stop elements ──
+  const stopEntries = [];
+  for (const s of cfg.stopSels) {
+    document.querySelectorAll(s.sel).forEach(el => {
+      stopEntries.push({ el, centerLock: s.centerLock });
+    });
+  }
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (prefersReduced) {
     titleEl.style.setProperty('--cs-flow-p', '1');
     // Wire hover highlighting without canvas
-    const allTargets = [titleEl, ...metaItems, ...triadCols, ...mediaEls, ...tabEls];
+    const allTargets = [titleEl, ...stopEntries.map(e => e.el)];
     allTargets.forEach((el) => {
       el.addEventListener('pointerenter', () => {
         titleEl.style.setProperty('--cs-flow-p', '0');
@@ -51,8 +86,8 @@
   // ── Accent color ──
   let aR = 168, aG = 85, aB = 247;
   const parseAccent = () => {
-    const raw = getComputedStyle(document.querySelector('.cs') || document.documentElement)
-      .getPropertyValue('--cs-accent').trim() || '#a855f7';
+    const raw = getComputedStyle(cfg.accentEl())
+      .getPropertyValue(cfg.accentVar).trim() || cfg.accentFallback;
     const d = document.createElement('div');
     d.style.color = raw;
     document.body.appendChild(d);
@@ -127,10 +162,7 @@
   const STOPS = [
     { posEl: titleEl, varEl: titleEl, kind: 'title', centerLock: false }
   ];
-  metaItems.forEach(el => STOPS.push({ posEl: el, varEl: el, kind: 'meta', centerLock: false }));
-  triadCols.forEach(el => STOPS.push({ posEl: el, varEl: el, kind: 'triad', centerLock: false }));
-  mediaEls.forEach(el  => STOPS.push({ posEl: el, varEl: el, kind: 'media', centerLock: true }));
-  tabEls.forEach(el    => STOPS.push({ posEl: el, varEl: el, kind: 'tab', centerLock: false }));
+  stopEntries.forEach(e => STOPS.push({ posEl: e.el, varEl: e.el, kind: 'stop', centerLock: e.centerLock }));
 
   // ── State ──
   let activeIdx      = -1;

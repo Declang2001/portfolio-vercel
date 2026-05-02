@@ -67,12 +67,17 @@
 }
 
 .halve-title {
+  --cs-flow-p: 0;
   font-size: clamp(2.6rem, 5vw, 4rem);
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.05;
   text-transform: lowercase;
-  color: #fff;
+  color: color-mix(in srgb, #ffffff calc((1 - var(--cs-flow-p)) * 100%), var(--page-accent, #C2410C));
+  text-shadow:
+    0 0 calc(10px * var(--cs-flow-p)) rgba(194, 65, 12, 0.45),
+    0 0 calc(28px * var(--cs-flow-p)) rgba(194, 65, 12, 0.15);
+  transition: color 0.4s ease, text-shadow 0.4s ease;
   margin-bottom: 1rem;
 }
 
