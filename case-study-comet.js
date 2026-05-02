@@ -10,10 +10,11 @@
     {
       titleSel: '.cs-hero .cs-title',
       stopSels: [
-        { sel: '.cs-hero .cs-meta-item', centerLock: false },
-        { sel: '.cs-triad-col', centerLock: false },
-        { sel: '.cs-gallery .cs-media', centerLock: true },
-        { sel: '.cs-tabs .cs-tab', centerLock: false }
+        { sel: '.cs-process .cs-process-tile', centerLock: true, kind: 'media' },
+        { sel: '.cs-hero .cs-meta-item', centerLock: false, kind: 'meta' },
+        { sel: '.cs-gallery .cs-media', centerLock: true, kind: 'media' },
+        { sel: '.cs-triad-col', centerLock: false, kind: 'triad' },
+        { sel: '.cs-tabs .cs-tab', centerLock: false, kind: 'tab' }
       ],
       accentEl: () => document.querySelector('.cs') || document.documentElement,
       accentVar: '--cs-accent',
@@ -22,9 +23,9 @@
     {
       titleSel: '.halve-title',
       stopSels: [
-        { sel: '.halve-meta-item', centerLock: false },
-        { sel: '.halve-section-label', centerLock: false },
-        { sel: '.halve-touchpoint-title', centerLock: false }
+        { sel: '.halve-meta-item', centerLock: false, kind: 'meta' },
+        { sel: '.halve-section-label', centerLock: false, kind: 'section' },
+        { sel: '.halve-touchpoint-title', centerLock: false, kind: 'touchpoint' }
       ],
       accentEl: () => document.documentElement,
       accentVar: '--page-accent',
@@ -45,7 +46,7 @@
   const stopEntries = [];
   for (const s of cfg.stopSels) {
     document.querySelectorAll(s.sel).forEach(el => {
-      stopEntries.push({ el, centerLock: s.centerLock });
+      stopEntries.push({ el, centerLock: s.centerLock, kind: s.kind || 'stop' });
     });
   }
 
@@ -82,6 +83,7 @@
   const POINTER_OFFSET  = 6;
   const INTRO_DELAY     = 1500;
   const LEAVE_DEBOUNCE  = 80;
+  const SCROLL_DEBOUNCE = 200;
 
   // ── Accent color ──
   let aR = 168, aG = 85, aB = 247;
@@ -162,7 +164,7 @@
   const STOPS = [
     { posEl: titleEl, varEl: titleEl, kind: 'title', centerLock: false }
   ];
-  stopEntries.forEach(e => STOPS.push({ posEl: e.el, varEl: e.el, kind: 'stop', centerLock: e.centerLock }));
+  stopEntries.forEach(e => STOPS.push({ posEl: e.el, varEl: e.el, kind: e.kind, centerLock: e.centerLock }));
 
   // ── State ──
   let activeIdx      = -1;
@@ -179,6 +181,9 @@
   let lastPointer    = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   let hoveredIdx     = -1;
   let leaveTimer     = 0;
+  let scrollTargetIdx = 0;
+  let scrollDebounceTimer = 0;
+  const visibleStops = new Set();
 
   // ── CSS var helpers ──
   const setFlowP = (idx, val) => {
@@ -408,9 +413,62 @@
     }
   };
 
-  // ── Hover handlers ──
+  // ── Scroll-guided targeting ──
+  const pickScrollTarget = () => {
+    if (visibleStops.size === 0) return scrollTargetIdx;
+    const vh = window.innerHeight;
+    const vcY = vh / 2;
+    let bestIdx = 0;
+    let bestScore = -Infinity;
+    visibleStops.forEach(idx => {
+      const r = STOPS[idx].posEl.getBoundingClientRect();
+      // Visible overlap ratio (how much of the element is in the viewport)
+      const visTop = Math.max(r.top, 0);
+      const visBot = Math.min(r.bottom, vh);
+      const overlap = Math.max(0, visBot - visTop) / (r.height || 1);
+      // Center proximity (normalized 0–1, 1 = at viewport center)
+      const cy = r.top + r.height / 2;
+      const proximity = 1 - Math.abs(cy - vcY) / vh;
+      // Combined score: overlap dominant, proximity secondary
+      let score = overlap * 0.55 + proximity * 0.45;
+      // Media elements get a small bonus so large gallery areas are not skipped
+      if (STOPS[idx].kind === 'media') score += 0.12;
+      if (score > bestScore) { bestScore = score; bestIdx = idx; }
+    });
+    return bestIdx;
+  };
+
+  const applyScrollTarget = () => {
+    const newTarget = pickScrollTarget();
+    scrollTargetIdx = newTarget;
+    if (hoveredIdx >= 0) return;
+    if (newTarget === activeIdx) return;
+    if (cometActive) cancelComet();
+    launch(activeIdx >= 0 ? activeIdx : 0, newTarget, COMET_DURATION);
+  };
+
+  const scheduleScrollUpdate = () => {
+    clearTimeout(scrollDebounceTimer);
+    scrollDebounceTimer = setTimeout(applyScrollTarget, SCROLL_DEBOUNCE);
+  };
+
+  const stopIO = new IntersectionObserver((entries) => {
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const idx = STOPS.findIndex(s => s.posEl === entry.target);
+      if (idx < 0) continue;
+      if (entry.isIntersecting) visibleStops.add(idx);
+      else visibleStops.delete(idx);
+    }
+    scheduleScrollUpdate();
+  }, { threshold: 0.15 });
+
+  STOPS.forEach(s => stopIO.observe(s.posEl));
+
+  // ── Hover handlers (temporary override) ──
   const onEnter = (idx) => {
     clearTimeout(leaveTimer);
+    clearTimeout(scrollDebounceTimer);
     hoveredIdx = idx;
     if (idx === activeIdx) return;
     if (cometActive) cancelComet();
@@ -421,9 +479,11 @@
     hoveredIdx = -1;
     leaveTimer = setTimeout(() => {
       if (hoveredIdx >= 0) return;
-      if (activeIdx === 0) return;
+      const target = pickScrollTarget();
+      scrollTargetIdx = target;
+      if (target === activeIdx) return;
       if (cometActive) cancelComet();
-      launch(activeIdx >= 0 ? activeIdx : 0, 0, HOVER_DURATION);
+      launch(activeIdx >= 0 ? activeIdx : 0, target, HOVER_DURATION);
     }, LEAVE_DEBOUNCE);
   };
 
@@ -445,9 +505,10 @@
   // All stops start at 0 (white)
   for (let i = 0; i < STOPS.length; i++) setActive(i, false);
 
-  // Intro comet: fly from below screen to title after entrance animations settle
+  // Intro: activate title in place after entrance animations settle
   setTimeout(() => {
-    const startPt = { x: window.innerWidth / 2, y: window.innerHeight + 60 };
-    launch(startPt, 0, COMET_DURATION);
+    activeIdx = 0;
+    setActive(0, true);
+    canvas.style.opacity = '1';
   }, INTRO_DELAY);
 })();
